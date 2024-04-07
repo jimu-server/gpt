@@ -1,0 +1,17 @@
+syntax="proto3";
+
+option go_package="../serve";
+
+//定义一个 Request的message 表示一个请求入参
+message Request {
+  string body = 1;
+}
+//定义一个Response的message 表示一个响应参数
+message Response{
+  string message = 1;
+}
+//定义一个服务名:TestGrpc
+//定义一个rpc方法:TestRpc，参数为Request，返回值为Response
+service TestGrpc {
+  rpc TestRpc(Request) returns (Response){}
+}
