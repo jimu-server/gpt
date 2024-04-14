@@ -1,4 +1,21 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <mapper namespace="GptMapper">
+    <insert id ="CreateConversation">
+        insert into app_chat_conversation(id, user_id, title)
+        VALUES ({Id}, {UserId}, {Title});
+    </insert>
 
+    <delete id="DelConversation">
+        delete
+        from app_chat_conversation
+        where user_id = {UserId}
+          and id = {Id};
+    </delete>
+
+    <select id="ConversationList">
+        select *
+        from app_chat_conversation
+        where user_id = {UserId}
+        order by create_time;
+    </select>
 </mapper>

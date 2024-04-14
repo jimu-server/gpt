@@ -1,12 +1,12 @@
 package mapper
 
-import "model"
+import "github.com/jimu-server/model"
 
 type GptMapper struct {
 
 	// 创建会话
 	CreateConversation func(any) error
-
-	// 查询会话
-	SelectConversation func(any) ([]model.Conversation, int64, error)
+	DelConversation    func(any) error
+	ConversationList   func(any) ([]model.AppChatConversationItem, error)
+	UpdateConversation func(any) error
 }
