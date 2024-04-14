@@ -28,9 +28,11 @@ func CreateConversation(c *gin.Context) {
 
 func DelConversation(c *gin.Context) {
 	var err error
-	var args *CreateConversationArgs
-	web.BindJSON(c, args)
-	if err = GptMapper.CreateConversation(args); err != nil {
+	var args map[string]string
+	web.BindJSON(c, &args)
+	token := c.MustGet(auth.Key).(*auth.Token)
+	args["UserId"] = token.Id
+	if err = GptMapper.DelConversation(args); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("创建失败")))
 		return
 	}
