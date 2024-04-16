@@ -1,12 +1,19 @@
 package mapper
 
-import "github.com/jimu-server/model"
+import (
+	"database/sql"
+	"github.com/jimu-server/model"
+)
 
 type GptMapper struct {
+	SelectMessageItem func(any) (*model.AppChatMessage, error)
 
 	// 创建会话
-	CreateConversation func(any) error
-	DelConversation    func(any) error
-	ConversationList   func(any) ([]model.AppChatConversationItem, error)
-	UpdateConversation func(any) error
+	CreateConversation        func(any) error
+	DelConversation           func(any) error
+	ConversationList          func(any) ([]model.AppChatConversationItem, error)
+	ConversationHistory       func(any) ([]model.AppChatMessage, error)
+	UpdateConversationLastMsg func(any, *sql.Tx) error
+
+	CreateMessage func(any, *sql.Tx) error
 }

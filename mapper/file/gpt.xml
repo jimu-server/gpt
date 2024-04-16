@@ -18,4 +18,32 @@
         where user_id = {UserId}
         order by create_time;
     </select>
+
+    <select id="ConversationHistory">
+        select *
+        from app_chat_message
+        where user_id = {UserId}
+          and conversation_id = {ConversationId}
+        order by create_time
+    </select>
+
+    <update id ="UpdateConversationLastMsg">
+        update app_chat_conversation
+        set last_msg={LastMsg},
+            last_model={LastModel},
+            last_time={LastTime}
+        where id = {Id}
+    </update>
+
+    <insert id="CreateMessage">
+        insert into app_chat_message(id, conversation_id, user_id, role, content, create_time)
+        VALUES ({Id}, {ConversationId}, {UserId}, {Role}, {Content}, {CreateTime})
+    </insert>
+
+    <select id="SelectMessageItem">
+        select *
+        from app_chat_message
+        where id = {Id}
+    </select>
+
 </mapper>
