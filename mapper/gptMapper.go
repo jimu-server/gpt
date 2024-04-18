@@ -16,4 +16,6 @@ type GptMapper struct {
 	UpdateConversationLastMsg func(any, *sql.Tx) error
 
 	CreateMessage func(any, *sql.Tx) error
+
+	ModelList func() ([]model.LLmModel, error)
 }

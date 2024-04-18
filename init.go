@@ -17,6 +17,7 @@ func init() {
 
 	chat := web.Engine.Group("/api/chat", auth.Authorization())
 
+	chat.GET("/model/list", control.GetLLmModel)                      // 获取模型
 	chat.POST("/conversation/create", control.CreateConversation)     // 创建会话
 	chat.POST("/conversation/del", control.DelConversation)           // 删除会话
 	chat.GET("/conversation/get", control.GetConversation)            // 查询会话列表

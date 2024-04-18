@@ -46,4 +46,9 @@
         where id = {Id}
     </select>
 
+    <select id="ModelList">
+        select *
+        from app_chat_model
+    </select>
+
 </mapper>

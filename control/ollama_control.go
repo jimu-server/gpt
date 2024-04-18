@@ -37,7 +37,10 @@ func Stream(c *gin.Context) {
 	//now := time.Now()
 	for data := range send {
 		var msg map[string]any
-		_ = jsoniter.Unmarshal(data.Data, &msg)
+		if err = jsoniter.Unmarshal(data.Data, &msg); err != nil {
+			logs.Error(err.Error())
+			break
+		}
 		content.WriteString(msg["message"].(map[string]any)["content"].(string))
 		_, err = c.Writer.Write(data.Data) // 根据你的实际情况调整
 		if err != nil {
@@ -58,7 +61,7 @@ func Stream(c *gin.Context) {
 		Id:             args.Id,
 		ConversationId: args.ConversationId,
 		UserId:         token.Id,
-		Role:           "gpt",
+		Role:           "assistant",
 		Content:        contentStr,
 		CreateTime:     format,
 	}
@@ -81,4 +84,14 @@ func Stream(c *gin.Context) {
 		return
 	}
 	begin.Commit()
+}
+
+func GetLLmModel(c *gin.Context) {
+	var err error
+	var models []model.LLmModel
+	if models, err = GptMapper.ModelList(); err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("查询失败")))
+		return
+	}
+	c.JSON(200, resp.Success(models))
 }
