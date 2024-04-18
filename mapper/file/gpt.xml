@@ -31,13 +31,14 @@
         update app_chat_conversation
         set last_msg={LastMsg},
             last_model={LastModel},
-            last_time={LastTime}
+            last_time={LastTime},
+            picture={Picture}
         where id = {Id}
     </update>
 
     <insert id="CreateMessage">
-        insert into app_chat_message(id, conversation_id, user_id, role, content, create_time)
-        VALUES ({Id}, {ConversationId}, {UserId}, {Role}, {Content}, {CreateTime})
+        insert into app_chat_message(id, conversation_id, user_id, model_id, picture, role, content, create_time)
+        VALUES ({Id}, {ConversationId}, {UserId},{ModelId}, {Picture}, {Role}, {Content}, {CreateTime})
     </insert>
 
     <select id="SelectMessageItem">
@@ -49,6 +50,16 @@
     <select id="ModelList">
         select *
         from app_chat_model
+    </select>
+
+    <select id="GetUserAvatar">
+        select picture
+        from app_user where id={Id}
+    </select>
+
+    <select id="GetModelAvatar">
+        select picture
+        from app_chat_model where id={Id}
     </select>
 
 </mapper>

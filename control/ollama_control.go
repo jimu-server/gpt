@@ -41,26 +41,38 @@ func Stream(c *gin.Context) {
 			logs.Error(err.Error())
 			break
 		}
-		content.WriteString(msg["message"].(map[string]any)["content"].(string))
+		v := msg["message"].(map[string]any)["content"].(string)
 		_, err = c.Writer.Write(data.Data) // 根据你的实际情况调整
+		flusher.Flush()                    // 立即将缓冲数据发送给客户端
 		if err != nil {
-			data.Resp.Body.Close()
-			return // 如果写入失败，结束函数
+			if err = data.Resp.Body.Close(); err != nil {
+				logs.Error(err.Error())
+				break
+			}
+			break // 如果写入失败，结束函数
 		}
-		flusher.Flush() // 立即将缓冲数据发送给客户端
+		content.WriteString(v)
 	}
+	contentStr := content.String()
+	logs.Warn(contentStr)
 	var begin *sql.Tx
 	if begin, err = db.DB.Begin(); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("开启事务失败")))
 		return
 	}
 	// 消息入库
+	picture := ""
+	if picture, err = GptMapper.GetModelAvatar(map[string]any{"Id": args.ModelId}); err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("发送失败")))
+		return
+	}
 	format := time.Now().Format("2006-01-02 15:04:05")
-	contentStr := content.String()
 	data := model.AppChatMessage{
 		Id:             args.Id,
 		ConversationId: args.ConversationId,
 		UserId:         token.Id,
+		ModelId:        args.ModelId,
+		Picture:        picture,
 		Role:           "assistant",
 		Content:        contentStr,
 		CreateTime:     format,
@@ -69,9 +81,10 @@ func Stream(c *gin.Context) {
 		c.JSON(500, resp.Error(err, resp.Msg("发送失败")))
 		return
 	}
+
 	update := model.AppChatConversationItem{
 		Id:         args.ConversationId,
-		Picture:    "",
+		Picture:    picture,
 		UserId:     "",
 		Title:      "",
 		LastModel:  args.Model,

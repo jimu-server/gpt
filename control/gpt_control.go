@@ -97,10 +97,18 @@ func Send(c *gin.Context) {
 		c.JSON(500, resp.Error(err, resp.Msg("开启事务失败")))
 		return
 	}
+	// 获取当前用户头像信息
+	var avatar string
+	if avatar, err = GptMapper.GetUserAvatar(map[string]string{"Id": token.Id}); err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("获取头像失败")))
+		return
+	}
 	data := model.AppChatMessage{
 		Id:             uuid.String(),
 		ConversationId: args.ConversationId,
 		UserId:         token.Id,
+		ModelId:        args.ModelId,
+		Picture:        avatar,
 		Role:           "user",
 		Content:        args.Content,
 		CreateTime:     time.Now().Format("2006-01-02 15:04:05"),

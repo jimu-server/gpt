@@ -18,4 +18,7 @@ type GptMapper struct {
 	CreateMessage func(any, *sql.Tx) error
 
 	ModelList func() ([]model.LLmModel, error)
+
+	GetUserAvatar  func(any) (string, error)
+	GetModelAvatar func(any) (string, error)
 }
