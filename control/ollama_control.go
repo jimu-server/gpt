@@ -22,7 +22,7 @@ func Stream(c *gin.Context) {
 	token := c.MustGet(auth.Key).(*auth.Token)
 	web.BindJSON(c, &args)
 	if send, err = llmSdk.Chat[api.ChatResponse](args.ChatRequest); err != nil {
-		c.JSON(500, resp.Error(err, resp.Msg("发送失败")))
+		c.JSON(500, resp.Error(err, resp.Msg("消息回复失败")))
 		return
 	}
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
@@ -30,14 +30,16 @@ func Stream(c *gin.Context) {
 	c.Writer.Header().Set("Connection", "keep-alive")
 	flusher, ok := c.Writer.(http.Flusher)
 	if !ok {
-		c.JSON(500, resp.Error(err, resp.Msg("发送失败")))
+		c.JSON(500, resp.Error(err, resp.Msg("消息回复失败")))
 		return
 	}
 	content := bytes.NewBuffer(nil)
 	//now := time.Now()
 	for data := range send {
 		v := data.Data()
-		_, err = c.Writer.Write(data.Body().Bytes()) // 根据你的实际情况调整
+		buffer := data.Body()
+		buffer.WriteString(llmSdk.Segmentation)
+		_, err = c.Writer.Write(buffer.Bytes()) // 根据你的实际情况调整
 		if err != nil {
 			if err = data.Close(); err != nil {
 				logs.Error(err.Error())
@@ -50,7 +52,6 @@ func Stream(c *gin.Context) {
 		content.WriteString(msg)
 	}
 	contentStr := content.String()
-	logs.Warn(contentStr)
 	var begin *sql.Tx
 	if begin, err = db.DB.Begin(); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("开启事务失败")))
@@ -59,6 +60,7 @@ func Stream(c *gin.Context) {
 	// 消息入库
 	picture := ""
 	if picture, err = GptMapper.GetModelAvatar(map[string]any{"Id": args.ModelId}); err != nil {
+		logs.Error(err.Error())
 		c.JSON(500, resp.Error(err, resp.Msg("发送失败")))
 		return
 	}
@@ -74,6 +76,7 @@ func Stream(c *gin.Context) {
 		CreateTime:     format,
 	}
 	if err = GptMapper.CreateMessage(data, begin); err != nil {
+		logs.Error(err.Error())
 		c.JSON(500, resp.Error(err, resp.Msg("发送失败")))
 		return
 	}
@@ -89,7 +92,13 @@ func Stream(c *gin.Context) {
 		CreateTime: "",
 	}
 	if err = GptMapper.UpdateConversationLastMsg(update, begin); err != nil {
-		c.JSON(500, resp.Error(err, resp.Msg("发送失败")))
+		logs.Error(err.Error())
+		if err = begin.Rollback(); err != nil {
+			logs.Error(err.Error())
+			c.JSON(500, resp.Error(err, resp.Msg("消息回复失败")))
+			return
+		}
+		c.JSON(500, resp.Error(err, resp.Msg("消息回复失败")))
 		return
 	}
 	begin.Commit()
