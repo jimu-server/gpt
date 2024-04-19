@@ -6,11 +6,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jimu-server/common/resp"
 	"github.com/jimu-server/db"
+	"github.com/jimu-server/gpt/llmSdk"
 	"github.com/jimu-server/middleware/auth"
 	"github.com/jimu-server/model"
 	"github.com/jimu-server/web"
-	jsoniter "github.com/json-iterator/go"
-	"github.com/ollama/ollama/sdk"
+	"github.com/ollama/ollama/api"
 	"net/http"
 	"time"
 )
@@ -18,10 +18,10 @@ import (
 func Stream(c *gin.Context) {
 	var err error
 	var args ChatArgs
-	var send <-chan sdk.StreamData
+	var send <-chan llmSdk.LLMStream[api.ChatResponse]
 	token := c.MustGet(auth.Key).(*auth.Token)
 	web.BindJSON(c, &args)
-	if send, err = sdk.Chat(args.ChatRequest); err != nil {
+	if send, err = llmSdk.Chat[api.ChatResponse](args.ChatRequest); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("发送失败")))
 		return
 	}
@@ -36,22 +36,18 @@ func Stream(c *gin.Context) {
 	content := bytes.NewBuffer(nil)
 	//now := time.Now()
 	for data := range send {
-		var msg map[string]any
-		if err = jsoniter.Unmarshal(data.Data, &msg); err != nil {
-			logs.Error(err.Error())
-			break
-		}
-		v := msg["message"].(map[string]any)["content"].(string)
-		_, err = c.Writer.Write(data.Data) // 根据你的实际情况调整
-		flusher.Flush()                    // 立即将缓冲数据发送给客户端
+		v := data.Data()
+		_, err = c.Writer.Write(data.Body().Bytes()) // 根据你的实际情况调整
 		if err != nil {
-			if err = data.Resp.Body.Close(); err != nil {
+			if err = data.Close(); err != nil {
 				logs.Error(err.Error())
 				break
 			}
 			break // 如果写入失败，结束函数
 		}
-		content.WriteString(v)
+		flusher.Flush() // 立即将缓冲数据发送给客户端
+		msg := v.Message.Content
+		content.WriteString(msg)
 	}
 	contentStr := content.String()
 	logs.Warn(contentStr)
