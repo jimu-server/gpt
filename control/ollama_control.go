@@ -68,6 +68,7 @@ func Stream(c *gin.Context) {
 	data := model.AppChatMessage{
 		Id:             args.Id,
 		ConversationId: args.ConversationId,
+		MessageId:      args.MessageId,
 		UserId:         token.Id,
 		ModelId:        args.ModelId,
 		Picture:        picture,

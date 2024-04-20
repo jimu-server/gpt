@@ -37,8 +37,8 @@
     </update>
 
     <insert id="CreateMessage">
-        insert into app_chat_message(id, conversation_id, user_id, model_id, picture, role, content, create_time)
-        VALUES ({Id}, {ConversationId}, {UserId},{ModelId}, {Picture}, {Role}, {Content}, {CreateTime})
+        insert into app_chat_message(id, conversation_id,message_id, user_id, model_id, picture, role, content, create_time)
+        VALUES ({Id}, {ConversationId}, {MessageId},{UserId},{ModelId}, {Picture}, {Role}, {Content}, {CreateTime})
     </insert>
 
     <select id="SelectMessageItem">

@@ -103,9 +103,14 @@ func Send(c *gin.Context) {
 		c.JSON(500, resp.Error(err, resp.Msg("获取头像失败")))
 		return
 	}
+	id := uuid.String()
+	if args.MessageId == "" {
+		args.MessageId = id
+	}
 	data := model.AppChatMessage{
-		Id:             uuid.String(),
+		Id:             id,
 		ConversationId: args.ConversationId,
+		MessageId:      args.MessageId,
 		UserId:         token.Id,
 		ModelId:        args.ModelId,
 		Picture:        avatar,
