@@ -114,3 +114,49 @@ func GetLLmModel(c *gin.Context) {
 	}
 	c.JSON(200, resp.Success(models))
 }
+
+func PullLLmModel(c *gin.Context) {
+	var err error
+	var args *api.PullRequest
+	var send <-chan llmSdk.LLMStream[api.ProgressResponse]
+	web.BindJSON(c, &args)
+	if send, err = llmSdk.Pull[api.ProgressResponse](args); err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("拉取失败")))
+		return
+	}
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		c.JSON(500, resp.Error(err, resp.Msg("消息回复失败")))
+		return
+	}
+	for data := range send {
+		buffer := data.Body()
+		buffer.WriteString(llmSdk.Segmentation)
+		logs.Info(buffer.String())
+		_, err = c.Writer.Write(buffer.Bytes()) // 根据你的实际情况调整
+		if err != nil {
+			if err = data.Close(); err != nil {
+				logs.Error(err.Error())
+				break
+			}
+			break // 如果写入失败，结束函数
+		}
+		flusher.Flush() // 立即将缓冲数据发送给客户端
+		progressResponse := data.Data()
+		if progressResponse.Status == "success" {
+			// 更新模型下载情况
+			params := map[string]any{
+				"Model": args.Name,
+				"Flag":  true,
+			}
+			if err = GptMapper.UpdateModelDownloadStatus(params); err != nil {
+				logs.Error("模型拉取数据库状态更新失败")
+				logs.Error(err.Error())
+				break
+			}
+		}
+	}
+}

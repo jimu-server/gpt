@@ -56,6 +56,8 @@ func (s *ollamaStream[T]) Data() T {
 
 type DataEvent[T any] <-chan LLMStream[T]
 
+// Chat
+// 模型对话聊天
 func Chat[T any](req *api.ChatRequest) (DataEvent[T], error) {
 	client := pool.Get().(*http.Client)
 	var err error
@@ -74,10 +76,62 @@ func Chat[T any](req *api.ChatRequest) (DataEvent[T], error) {
 	if err != nil {
 		return nil, err
 	}
-	return chat[T](do)
+	return stream[T](do)
 }
 
-func chat[T any](response *http.Response) (DataEvent[T], error) {
+func Pull[T any](req *api.PullRequest) (DataEvent[T], error) {
+	client := pool.Get().(*http.Client)
+	var err error
+	var request *http.Request
+	marshal, err := jsoniter.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	buffer := bytes.NewBuffer(marshal)
+	url := fmt.Sprintf("http://%s:%s/api/pull", ollama_host, ollama_port)
+	request, err = http.NewRequest(http.MethodPost, url, buffer)
+	if err != nil {
+		return nil, err
+	}
+	do, err := client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	return stream[T](do)
+}
+
+// ModelInfo
+// 获取模型信息
+func ModelInfo(req *api.ShowRequest) (*api.ShowResponse, error) {
+	client := pool.Get().(*http.Client)
+	var err error
+	var request *http.Request
+	marshal, err := jsoniter.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	buffer := bytes.NewBuffer(marshal)
+	url := fmt.Sprintf("http://%s:%s/api/show", ollama_host, ollama_port)
+	request, err = http.NewRequest(http.MethodPost, url, buffer)
+	if err != nil {
+		return nil, err
+	}
+	do, err := client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	var data *api.ShowResponse
+	var readAll []byte
+	if readAll, err = io.ReadAll(do.Body); err != nil {
+		return nil, err
+	}
+	if err = jsoniter.Unmarshal(readAll, &data); err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func stream[T any](response *http.Response) (DataEvent[T], error) {
 	send := make(chan LLMStream[T], 100)
 	go func() {
 		var err error
@@ -92,27 +146,27 @@ func chat[T any](response *http.Response) (DataEvent[T], error) {
 		defer close(send)
 		for scanner.Scan() {
 			buf = scanner.Bytes()
-			stream := &ollamaStream[T]{}
+			streamData := &ollamaStream[T]{}
 			if err = scanner.Err(); err == io.EOF {
 				break // 文件结束
 			} else if errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.ErrClosedPipe) {
-				stream.err = err
-				send <- stream
+				streamData.err = err
+				send <- streamData
 				break
 			} else if err != nil {
-				stream.err = err
-				send <- stream
+				streamData.err = err
+				send <- streamData
 				break
 			}
 			if err = jsoniter.Unmarshal(buf, &data); err != nil {
-				stream.err = err
-				send <- stream
+				streamData.err = err
+				send <- streamData
 				break
 			}
-			stream.entity = data
-			stream.resp = response
-			stream.body = bytes.NewBuffer(buf)
-			send <- stream
+			streamData.entity = data
+			streamData.resp = response
+			streamData.body = bytes.NewBuffer(buf)
+			send <- streamData
 		}
 	}()
 	return send, nil

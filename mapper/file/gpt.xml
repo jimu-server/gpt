@@ -52,6 +52,10 @@
         from app_chat_model
     </select>
 
+    <update id="UpdateModelDownloadStatus">
+        update app_chat_model set is_download={Flag} where model={Model}
+    </update>
+
     <select id="GetUserAvatar">
         select picture
         from app_user where id={Id}
