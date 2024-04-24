@@ -131,6 +131,29 @@ func ModelInfo(req *api.ShowRequest) (*api.ShowResponse, error) {
 	return data, nil
 }
 
+func DeleteModel(req *api.DeleteRequest) error {
+	client := pool.Get().(*http.Client)
+	var err error
+	var request *http.Request
+	marshal, err := jsoniter.Marshal(req)
+	if err != nil {
+		return err
+	}
+	buffer := bytes.NewBuffer(marshal)
+	url := fmt.Sprintf("http://%s:%s/api/delete", ollama_host, ollama_port)
+	if request, err = http.NewRequest(http.MethodDelete, url, buffer); err != nil {
+		return err
+	}
+	do, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+	if do.StatusCode == http.StatusOK {
+		return nil
+	}
+	return errors.New("删除失败")
+}
+
 func stream[T any](response *http.Response) (DataEvent[T], error) {
 	send := make(chan LLMStream[T], 100)
 	go func() {

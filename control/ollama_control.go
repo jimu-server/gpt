@@ -135,14 +135,16 @@ func PullLLmModel(c *gin.Context) {
 	for data := range send {
 		buffer := data.Body()
 		buffer.WriteString(llmSdk.Segmentation)
-		logs.Info(buffer.String())
 		_, err = c.Writer.Write(buffer.Bytes()) // 根据你的实际情况调整
 		if err != nil {
+			logs.Error(err.Error())
 			if err = data.Close(); err != nil {
 				logs.Error(err.Error())
-				break
+				c.JSON(500, resp.Error(err, resp.Msg("模型下载失败")))
+				return
 			}
-			break // 如果写入失败，结束函数
+			c.JSON(500, resp.Error(err, resp.Msg("模型下载失败")))
+			return // 如果写入失败，结束函数
 		}
 		flusher.Flush() // 立即将缓冲数据发送给客户端
 		progressResponse := data.Data()
@@ -155,8 +157,31 @@ func PullLLmModel(c *gin.Context) {
 			if err = GptMapper.UpdateModelDownloadStatus(params); err != nil {
 				logs.Error("模型拉取数据库状态更新失败")
 				logs.Error(err.Error())
-				break
+				c.JSON(500, resp.Error(err, resp.Msg("模型下载失败")))
+				return
 			}
 		}
 	}
+}
+
+func DeleteLLmModel(c *gin.Context) {
+	var err error
+	var args *api.DeleteRequest
+	web.BindJSON(c, &args)
+	if err = llmSdk.DeleteModel(args); err != nil {
+		logs.Error(err.Error())
+		c.JSON(500, resp.Error(err, resp.Msg("ollama模型删除失败")))
+		return
+	}
+	// 修改模型下载状态
+	params := map[string]any{
+		"Model": args.Name,
+		"Flag":  false,
+	}
+	if err = GptMapper.UpdateModelDownloadStatus(params); err != nil {
+		logs.Error(err.Error())
+		c.JSON(500, resp.Error(err, resp.Msg("模型删除失败")))
+		return
+	}
+	c.JSON(200, resp.Success(nil))
 }
