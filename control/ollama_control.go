@@ -9,6 +9,7 @@ import (
 	"github.com/jimu-server/gpt/llmSdk"
 	"github.com/jimu-server/middleware/auth"
 	"github.com/jimu-server/model"
+	"github.com/jimu-server/util/uuidutils/uuid"
 	"github.com/jimu-server/web"
 	"github.com/ollama/ollama/api"
 	"net/http"
@@ -118,8 +119,24 @@ func GetLLmModel(c *gin.Context) {
 func PullLLmModel(c *gin.Context) {
 	var err error
 	var args *api.PullRequest
+	var flag bool
 	var send <-chan llmSdk.LLMStream[api.ProgressResponse]
 	web.BindJSON(c, &args)
+	params := map[string]any{
+		"Model": args.Name,
+		"Flag":  true,
+	}
+	// 检查模型是否已经下载
+	if flag, err = GptMapper.SelectModelStatus(params); err != nil {
+		logs.Error(err.Error())
+		c.JSON(500, resp.Error(err, resp.Msg("下载失败")))
+		return
+	}
+	// 模型以下载
+	if flag {
+		c.JSON(200, resp.Success(nil))
+		return
+	}
 	if send, err = llmSdk.Pull[api.ProgressResponse](args); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("拉取失败")))
 		return
@@ -129,7 +146,7 @@ func PullLLmModel(c *gin.Context) {
 	c.Writer.Header().Set("Connection", "keep-alive")
 	flusher, ok := c.Writer.(http.Flusher)
 	if !ok {
-		c.JSON(500, resp.Error(err, resp.Msg("消息回复失败")))
+		c.JSON(500, resp.Error(err, resp.Msg("模型下载失败")))
 		return
 	}
 	for data := range send {
@@ -150,10 +167,6 @@ func PullLLmModel(c *gin.Context) {
 		progressResponse := data.Data()
 		if progressResponse.Status == "success" {
 			// 更新模型下载情况
-			params := map[string]any{
-				"Model": args.Name,
-				"Flag":  true,
-			}
 			if err = GptMapper.UpdateModelDownloadStatus(params); err != nil {
 				logs.Error("模型拉取数据库状态更新失败")
 				logs.Error(err.Error())
@@ -164,20 +177,112 @@ func PullLLmModel(c *gin.Context) {
 	}
 }
 
+func CreateLLmModel(c *gin.Context) {
+	var err error
+	var args *CreateModel
+	var send <-chan llmSdk.LLMStream[api.ProgressResponse]
+	web.BindJSON(c, &args)
+	token := c.MustGet(auth.Key).(*auth.Token)
+	// 检查模型是否存在
+	var modelIbfo bool
+	params := map[string]any{
+		"Model": args.Name,
+	}
+	if modelIbfo, err = GptMapper.ModelExists(params); err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("模型已存在")))
+		return
+	}
+	if modelIbfo {
+		c.JSON(500, resp.Error(err, resp.Msg("模型已存在")))
+		return
+	}
+
+	var baseModeInfo *model.LLmModel
+	params["Model"] = args.BaseModel
+	if baseModeInfo, err = GptMapper.ModelInfo(params); err != nil {
+		logs.Error(err.Error())
+		c.JSON(500, resp.Error(err, resp.Msg("模型创建失败")))
+		return
+	}
+
+	if !baseModeInfo.IsDownload {
+		logs.Warn("模型已被删除")
+		c.JSON(500, resp.Error(nil, resp.Msg("模型已被删除")))
+	}
+
+	if send, err = llmSdk.CreateModel[api.ProgressResponse](args.CreateRequest); err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("模型创建失败")))
+		return
+	}
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		c.JSON(500, resp.Error(err, resp.Msg("模型创建失败")))
+		return
+	}
+	for data := range send {
+		buffer := data.Body()
+		buffer.WriteString(llmSdk.Segmentation)
+		_, err = c.Writer.Write(buffer.Bytes()) // 根据你的实际情况调整
+		if err != nil {
+			logs.Error(err.Error())
+			if err = data.Close(); err != nil {
+				logs.Error(err.Error())
+				c.JSON(500, resp.Error(err, resp.Msg("模型创建失败")))
+				return
+			}
+			c.JSON(500, resp.Error(err, resp.Msg("模型创建失败")))
+			return // 如果写入失败，结束函数
+		}
+		flusher.Flush() // 立即将缓冲数据发送给客户端
+		progressResponse := data.Data()
+		if progressResponse.Status == "success" {
+			// 更新模型下载情况
+			baseModeInfo.Name = args.Name
+			baseModeInfo.Model = args.Name
+			baseModeInfo.UserId = token.Id
+			baseModeInfo.Pid = baseModeInfo.Id
+			baseModeInfo.Id = uuid.String()
+			if err = GptMapper.CreateModel(baseModeInfo); err != nil {
+				logs.Error("模型拉取数据库状态更新失败")
+				logs.Error(err.Error())
+				c.JSON(500, resp.Error(err, resp.Msg("模型下载失败")))
+				return
+			}
+		}
+	}
+
+	c.JSON(200, resp.Success(nil))
+}
+
 func DeleteLLmModel(c *gin.Context) {
 	var err error
 	var args *api.DeleteRequest
+	var flag bool
 	web.BindJSON(c, &args)
-	if err = llmSdk.DeleteModel(args); err != nil {
-		logs.Error(err.Error())
-		c.JSON(500, resp.Error(err, resp.Msg("ollama模型删除失败")))
-		return
-	}
 	// 修改模型下载状态
 	params := map[string]any{
 		"Model": args.Name,
 		"Flag":  false,
 	}
+	if flag, err = GptMapper.SelectModelStatus(params); err != nil {
+		logs.Error(err.Error())
+		c.JSON(500, resp.Error(err, resp.Msg("删除失败")))
+		return
+	}
+	// 模型已删除 直接返回成功
+	if !flag {
+		c.JSON(200, resp.Success(nil))
+		return
+	}
+	if err = llmSdk.DeleteModel(args); err != nil {
+		logs.Error(err.Error())
+		c.JSON(500, resp.Error(err, resp.Msg("ollama模型删除失败")))
+		return
+	}
+
 	if err = GptMapper.UpdateModelDownloadStatus(params); err != nil {
 		logs.Error(err.Error())
 		c.JSON(500, resp.Error(err, resp.Msg("模型删除失败")))

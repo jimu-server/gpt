@@ -15,6 +15,11 @@ type GptMapper struct {
 	ConversationHistory       func(any) ([]model.AppChatMessage, error)
 	UpdateConversationLastMsg func(any, *sql.Tx) error
 
+	SelectModelStatus func(any) (bool, error)
+	ModelExists       func(any) (bool, error)
+	ModelInfo         func(any) (*model.LLmModel, error)
+	CreateModel       func(any) error
+
 	CreateMessage func(any, *sql.Tx) error
 
 	ModelList                 func() ([]model.LLmModel, error)

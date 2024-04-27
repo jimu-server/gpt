@@ -154,6 +154,26 @@ func DeleteModel(req *api.DeleteRequest) error {
 	return errors.New("删除失败")
 }
 
+func CreateModel[T any](req *api.CreateRequest) (DataEvent[T], error) {
+	client := pool.Get().(*http.Client)
+	var err error
+	var request *http.Request
+	marshal, err := jsoniter.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	buffer := bytes.NewBuffer(marshal)
+	url := fmt.Sprintf("http://%s:%s/api/create", ollama_host, ollama_port)
+	if request, err = http.NewRequest(http.MethodPost, url, buffer); err != nil {
+		return nil, err
+	}
+	do, err := client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	return stream[T](do)
+}
+
 func stream[T any](response *http.Response) (DataEvent[T], error) {
 	send := make(chan LLMStream[T], 100)
 	go func() {

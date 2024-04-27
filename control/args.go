@@ -26,3 +26,8 @@ type SendMessageArgs struct {
 	ModelId        string `json:"modelId" form:"modelId" binding:"required"`
 	MessageId      string `json:"messageId" form:"messageId"`
 }
+
+type CreateModel struct {
+	BaseModel string `json:"baseModel"`
+	*api.CreateRequest
+}

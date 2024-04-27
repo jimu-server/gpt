@@ -56,6 +56,28 @@
         update app_chat_model set is_download={Flag} where model={Model}
     </update>
 
+    <select id="SelectModelStatus">
+        select is_download
+        from app_chat_model
+        where model = {Model}
+    </select>
+    <select id="ModelExists">
+        select exists(select id
+                      from app_chat_model
+                      where model = {Model}) as flag
+
+    </select>
+    <select id="ModelInfo">
+        select *
+        from app_chat_model
+        where model = {Model}
+    </select>
+
+    <insert id="CreateModel">
+        insert into app_chat_model(id, pid, user_id, , name, model, picture, size, is_download)
+        VALUES ({Id}, {Pid}, {UserId}, {Name}, {Model}, {Picture}, {Size}, {IsDownload})
+    </insert>
+
     <select id="GetUserAvatar">
         select picture
         from app_user where id={Id}
