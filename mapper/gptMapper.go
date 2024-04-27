@@ -22,7 +22,13 @@ type GptMapper struct {
 
 	CreateMessage func(any, *sql.Tx) error
 
-	ModelList                 func() ([]model.LLmModel, error)
+	// 查询用户可用模型
+	ModelList func(any) ([]model.LLmModel, error)
+
+	// 管理擦汗寻查询 内置基础模型
+	BaseModelList func(any) ([]model.LLmModel, error)
+
+	// 更新模型状态
 	UpdateModelDownloadStatus func(any) error
 
 	GetUserAvatar  func(any) (string, error)

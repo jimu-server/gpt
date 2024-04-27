@@ -109,7 +109,9 @@ func Stream(c *gin.Context) {
 func GetLLmModel(c *gin.Context) {
 	var err error
 	var models []model.LLmModel
-	if models, err = GptMapper.ModelList(); err != nil {
+	token := c.MustGet(auth.Key).(*auth.Token)
+	params := map[string]any{"UserId": token.Id}
+	if models, err = GptMapper.ModelList(params); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("查询失败")))
 		return
 	}
@@ -289,4 +291,16 @@ func DeleteLLmModel(c *gin.Context) {
 		return
 	}
 	c.JSON(200, resp.Success(nil))
+}
+
+func ModelList(c *gin.Context) {
+	var err error
+	var models []model.LLmModel
+	token := c.MustGet(auth.Key).(*auth.Token)
+	params := map[string]any{"UserId": token.Id}
+	if models, err = GptMapper.BaseModelList(params); err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("查询失败")))
+		return
+	}
+	c.JSON(200, resp.Success(models))
 }
