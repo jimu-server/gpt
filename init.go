@@ -36,4 +36,5 @@ func init() {
 	chat.GET("/msg", control.GetMessageItem)                          // 查询指定消息
 
 	chat.POST("/knowledge/create", control.CreateKnowledge) // 创建知识
+	chat.GET("/knowledge/list", control.GetKnowledgeList)   // 创建知识
 }

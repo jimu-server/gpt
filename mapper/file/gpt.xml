@@ -109,4 +109,11 @@
         </for>
     </insert>
 
+    <select id="KnowledgeList">
+        select *
+        from app_chat_knowledge_file
+        where user_id = {UserId}
+        order by create_time
+    </select>
+
 </mapper>

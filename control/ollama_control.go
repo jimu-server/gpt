@@ -9,6 +9,7 @@ import (
 	"github.com/jimu-server/gpt/llmSdk"
 	"github.com/jimu-server/middleware/auth"
 	"github.com/jimu-server/model"
+	"github.com/jimu-server/util/treeutils/tree"
 	"github.com/jimu-server/util/uuidutils/uuid"
 	"github.com/jimu-server/web"
 	"github.com/ollama/ollama/api"
@@ -364,7 +365,20 @@ func CreateKnowledge(c *gin.Context) {
 }
 
 func GetKnowledgeList(c *gin.Context) {
-
+	var err error
+	pid := c.Query("pid")
+	token := c.MustGet(auth.Key).(*auth.Token)
+	params := map[string]any{
+		"Pid":    pid,
+		"UserId": token.Id,
+	}
+	var list []*model.AppChatKnowledgeFile
+	if list, err = GptMapper.KnowledgeList(params); err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("查询失败")))
+		return
+	}
+	trees := tree.BuildTree(pid, list)
+	c.JSON(200, resp.Success(trees))
 }
 
 func DeleteKnowledge(c *gin.Context) {
