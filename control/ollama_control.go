@@ -12,6 +12,7 @@ import (
 	"github.com/jimu-server/util/uuidutils/uuid"
 	"github.com/jimu-server/web"
 	"github.com/ollama/ollama/api"
+	"mime/multipart"
 	"net/http"
 	"time"
 )
@@ -303,4 +304,73 @@ func ModelList(c *gin.Context) {
 		return
 	}
 	c.JSON(200, resp.Success(models))
+}
+
+func CreateKnowledge(c *gin.Context) {
+	var err error
+	var form *multipart.Form
+	token := c.MustGet(auth.Key).(*auth.Token)
+	var list []*model.AppChatKnowledgeFile
+	if form, err = c.MultipartForm(); form == nil || err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("上传失败")))
+		return
+	}
+	args := KnowledgeArgs{
+		Pid:     form.Value["pid"][0],
+		Folders: form.Value["folders"],
+	}
+
+	// 处理文件夹创建
+	if len(args.Folders) > 0 {
+		for _, v := range args.Folders {
+			list = append(list, &model.AppChatKnowledgeFile{
+				Id:       uuid.String(),
+				Pid:      args.Pid,
+				UserId:   token.Id,
+				FileName: v,
+				FileType: 0,
+				IsGen:    true,
+			})
+		}
+	}
+
+	// 处理文件上传
+	if files := form.File["files"]; files != nil {
+		for _, file := range files {
+			list = append(list, &model.AppChatKnowledgeFile{
+				Id:       uuid.String(),
+				Pid:      args.Pid,
+				UserId:   token.Id,
+				FileName: file.Filename,
+				FileType: 1,
+				IsGen:    true,
+			})
+		}
+	}
+
+	if len(list) == 0 {
+		c.JSON(200, resp.Success(nil))
+		return
+	}
+	params := map[string]any{
+		"list": list,
+	}
+	if err = GptMapper.InsertKnowledge(params); err != nil {
+		logs.Error(err.Error())
+		c.JSON(500, resp.Error(err, resp.Msg("创建失败")))
+		return
+	}
+	c.JSON(200, resp.Success(nil))
+}
+
+func GetKnowledgeList(c *gin.Context) {
+
+}
+
+func DeleteKnowledge(c *gin.Context) {
+
+}
+
+func UpdateKnowledge(c *gin.Context) {
+
 }

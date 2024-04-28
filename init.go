@@ -34,4 +34,6 @@ func init() {
 	chat.POST("/send", control.Send)                                  // 发送消息
 	chat.GET("/uuid", control.GetUid)                                 // 生成消息uuid
 	chat.GET("/msg", control.GetMessageItem)                          // 查询指定消息
+
+	chat.POST("/knowledge/create", control.CreateKnowledge) // 创建知识
 }

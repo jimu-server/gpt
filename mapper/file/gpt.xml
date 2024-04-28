@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <mapper namespace="GptMapper">
-    <insert id ="CreateConversation">
+    <insert id="CreateConversation">
         insert into app_chat_conversation(id, user_id, title)
         VALUES ({Id}, {UserId}, {Title});
     </insert>
@@ -27,7 +27,7 @@
         order by create_time
     </select>
 
-    <update id ="UpdateConversationLastMsg">
+    <update id="UpdateConversationLastMsg">
         update app_chat_conversation
         set last_msg={LastMsg},
             last_model={LastModel},
@@ -37,8 +37,9 @@
     </update>
 
     <insert id="CreateMessage">
-        insert into app_chat_message(id, conversation_id,message_id, user_id, model_id, picture, role, content, create_time)
-        VALUES ({Id}, {ConversationId}, {MessageId},{UserId},{ModelId}, {Picture}, {Role}, {Content}, {CreateTime})
+        insert into app_chat_message(id, conversation_id, message_id, user_id, model_id, picture, role, content,
+                                     create_time)
+        VALUES ({Id}, {ConversationId}, {MessageId}, {UserId}, {ModelId}, {Picture}, {Role}, {Content}, {CreateTime})
     </insert>
 
     <select id="SelectMessageItem">
@@ -50,10 +51,20 @@
     <select id="ModelList">
         select *
         from app_chat_model
+        where user_id = {UserId}
+    </select>
+
+    <select id="BaseModelList">
+        select *
+        from app_chat_model
+        where id = pid
+          and user_id = {UserId}
     </select>
 
     <update id="UpdateModelDownloadStatus">
-        update app_chat_model set is_download={Flag} where model={Model}
+        update app_chat_model
+        set is_download={Flag}
+        where model = {Model}
     </update>
 
     <select id="SelectModelStatus">
@@ -80,12 +91,22 @@
 
     <select id="GetUserAvatar">
         select picture
-        from app_user where id={Id}
+        from app_user
+        where id = {Id}
     </select>
 
     <select id="GetModelAvatar">
         select picture
-        from app_chat_model where id={Id}
+        from app_chat_model
+        where id = {Id}
     </select>
+
+    <insert id="InsertKnowledge">
+        insert into app_chat_knowledge_file(id, pid, user_id, file_name, file_path, file_type, is_gen)
+        VALUES
+        <for slice="{list}" item="obj" separator=",">
+            ({obj.Id},{obj.Pid},{obj.UserId},{obj.FileName},{obj.FilePath},{obj.FileType},{obj.IsGen})
+        </for>
+    </insert>
 
 </mapper>

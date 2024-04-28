@@ -31,3 +31,8 @@ type CreateModel struct {
 	BaseModel string `json:"baseModel"`
 	*api.CreateRequest
 }
+
+type KnowledgeArgs struct {
+	Pid     string   `json:"pid" form:"pid"`
+	Folders []string `json:"folders" form:"folders"`
+}

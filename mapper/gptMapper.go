@@ -33,4 +33,6 @@ type GptMapper struct {
 
 	GetUserAvatar  func(any) (string, error)
 	GetModelAvatar func(any) (string, error)
+
+	InsertKnowledge func(any) error
 }
