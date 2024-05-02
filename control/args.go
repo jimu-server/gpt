@@ -36,3 +36,9 @@ type KnowledgeArgs struct {
 	Pid     string   `json:"pid" form:"pid"`
 	Folders []string `json:"folders" form:"folders"`
 }
+
+type GenKnowledgeArgs struct {
+	Name        string   `json:"name" form:"name"`
+	Description string   `json:"description" form:"description"`
+	Files       []string `json:"files" form:"files"`
+}

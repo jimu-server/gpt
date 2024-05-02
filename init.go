@@ -35,6 +35,8 @@ func init() {
 	chat.GET("/uuid", control.GetUid)                                 // 生成消息uuid
 	chat.GET("/msg", control.GetMessageItem)                          // 查询指定消息
 
-	chat.POST("/knowledge/create", control.CreateKnowledge) // 创建知识
-	chat.GET("/knowledge/list", control.GetKnowledgeList)   // 创建知识
+	chat.POST("/knowledge/file/create", control.CreateKnowledgeFile) // 创建知识库文件
+	chat.GET("/knowledge/file/list", control.GetKnowledgeFileList)   // 查询知识库文件列表
+	chat.GET("/knowledge/list", control.GetKnowledgeList)            // 查询知识库
+	chat.POST("/knowledge/gen", control.GenKnowledge)                // 生成知识库
 }

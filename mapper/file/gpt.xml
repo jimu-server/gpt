@@ -85,7 +85,7 @@
     </select>
 
     <insert id="CreateModel">
-        insert into app_chat_model(id, pid, user_id, , name, model, picture, size, is_download)
+        insert into app_chat_model(id, pid, user_id, name, model, picture, size, is_download)
         VALUES ({Id}, {Pid}, {UserId}, {Name}, {Model}, {Picture}, {Size}, {IsDownload})
     </insert>
 
@@ -101,19 +101,40 @@
         where id = {Id}
     </select>
 
-    <insert id="InsertKnowledge">
-        insert into app_chat_knowledge_file(id, pid, user_id, file_name, file_path, file_type, is_gen)
+    <insert id="InsertKnowledgeFile">
+        insert into app_chat_knowledge_file(id, pid, user_id, file_name, file_path, file_type)
         VALUES
         <for slice="{list}" item="obj" separator=",">
-            ({obj.Id},{obj.Pid},{obj.UserId},{obj.FileName},{obj.FilePath},{obj.FileType},{obj.IsGen})
+            ({obj.Id},{obj.Pid},{obj.UserId},{obj.FileName},{obj.FilePath},{obj.FileType})
         </for>
     </insert>
 
-    <select id="KnowledgeList">
+    <select id="KnowledgeFileList">
         select *
         from app_chat_knowledge_file
         where user_id = {UserId}
         order by create_time
     </select>
+
+    <select id="KnowledgeList">
+        select *
+        from app_chat_knowledge_instance
+        where user_id = {UserId}
+    </select>
+
+    <select id="KnowledgeFileListById">
+        select *
+        from app_chat_knowledge_file
+        where user_id = {UserId}
+          and id in
+        <for slice="{list}" item="id" open="(" separator="," close=")">
+            id
+        </for>
+    </select>
+
+    <insert id="CreateKnowledge">
+        insert into app_chat_knowledge_instance (id, user_id, knowledge_name, knowledge_files, knowledge_description)
+        values ({Id}, {UserId}, {KnowledgeName}, {KnowledgeFiles}, {KnowledgeDescription});
+    </insert>
 
 </mapper>

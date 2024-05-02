@@ -2,19 +2,31 @@ package control
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jimu-server/common/resp"
+	"github.com/jimu-server/config"
 	"github.com/jimu-server/db"
 	"github.com/jimu-server/gpt/llmSdk"
 	"github.com/jimu-server/middleware/auth"
 	"github.com/jimu-server/model"
+	"github.com/jimu-server/office"
+	"github.com/jimu-server/oss"
 	"github.com/jimu-server/util/treeutils/tree"
 	"github.com/jimu-server/util/uuidutils/uuid"
 	"github.com/jimu-server/web"
+	"github.com/jimu-server/web/progress"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/ollama/ollama/api"
+	"github.com/philippgille/chromem-go"
+	"github.com/tencentyun/cos-go-sdk-v5"
+	"io"
 	"mime/multipart"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -307,7 +319,7 @@ func ModelList(c *gin.Context) {
 	c.JSON(200, resp.Success(models))
 }
 
-func CreateKnowledge(c *gin.Context) {
+func CreateKnowledgeFile(c *gin.Context) {
 	var err error
 	var form *multipart.Form
 	token := c.MustGet(auth.Key).(*auth.Token)
@@ -330,7 +342,6 @@ func CreateKnowledge(c *gin.Context) {
 				UserId:   token.Id,
 				FileName: v,
 				FileType: 0,
-				IsGen:    true,
 			})
 		}
 	}
@@ -338,13 +349,32 @@ func CreateKnowledge(c *gin.Context) {
 	// 处理文件上传
 	if files := form.File["files"]; files != nil {
 		for _, file := range files {
+			if !strings.HasSuffix(file.Filename, ".docx") {
+				c.JSON(500, resp.Error(err, resp.Msg("上传失败")))
+				return
+			}
+			open, err := file.Open()
+			if err != nil {
+				c.JSON(500, resp.Error(err, resp.Msg("上传失败")))
+				return
+			}
+			// 上传文件服务器
+			// 创建存储路径
+			id := uuid.String()
+			name := fmt.Sprintf("%s/knowledge/%s.docx", token.Id, id)
+			// 执行推送到对象存储
+			if _, err = oss.Tencent.Object.Put(context.Background(), name, open, nil); err != nil {
+				c.JSON(500, resp.Error(err, resp.Msg("上传失败")))
+				return
+			}
+			full := fmt.Sprintf("%s/%s", config.Evn.App.Tencent.BucketURL, name)
 			list = append(list, &model.AppChatKnowledgeFile{
-				Id:       uuid.String(),
+				Id:       id,
 				Pid:      args.Pid,
 				UserId:   token.Id,
 				FileName: file.Filename,
+				FilePath: full,
 				FileType: 1,
-				IsGen:    true,
 			})
 		}
 	}
@@ -356,7 +386,7 @@ func CreateKnowledge(c *gin.Context) {
 	params := map[string]any{
 		"list": list,
 	}
-	if err = GptMapper.InsertKnowledge(params); err != nil {
+	if err = GptMapper.InsertKnowledgeFile(params); err != nil {
 		logs.Error(err.Error())
 		c.JSON(500, resp.Error(err, resp.Msg("创建失败")))
 		return
@@ -364,7 +394,7 @@ func CreateKnowledge(c *gin.Context) {
 	c.JSON(200, resp.Success(nil))
 }
 
-func GetKnowledgeList(c *gin.Context) {
+func GetKnowledgeFileList(c *gin.Context) {
 	var err error
 	pid := c.Query("pid")
 	token := c.MustGet(auth.Key).(*auth.Token)
@@ -373,7 +403,7 @@ func GetKnowledgeList(c *gin.Context) {
 		"UserId": token.Id,
 	}
 	var list []*model.AppChatKnowledgeFile
-	if list, err = GptMapper.KnowledgeList(params); err != nil {
+	if list, err = GptMapper.KnowledgeFileList(params); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("查询失败")))
 		return
 	}
@@ -387,4 +417,171 @@ func DeleteKnowledge(c *gin.Context) {
 
 func UpdateKnowledge(c *gin.Context) {
 
+}
+
+func GenKnowledge(c *gin.Context) {
+	var err error
+	token := c.MustGet(auth.Key).(*auth.Token)
+	var args *GenKnowledgeArgs
+	var percent float64 = 0
+	web.BindJSON(c, &args)
+	taskProgress, err := progress.NewProgress(c.Writer)
+	if err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("任务失败")))
+		return
+	}
+	if len(args.Files) == 0 {
+		percent = 100
+		if err = taskProgress.Progress(percent, "完成"); err != nil {
+			c.JSON(500, resp.Error(err, resp.Msg("任务失败")))
+			return
+		}
+		return
+	}
+	if err = taskProgress.Progress(percent, "加载数据文件.."); err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("任务失败")))
+		return
+	}
+	// 获取对应文件数据
+	var filelist []*model.AppChatKnowledgeFile
+	params := map[string]any{
+		"UserId": token.Id,
+		"list":   args.Files,
+	}
+	// 解析文件内容
+	if filelist, err = GptMapper.KnowledgeFileListById(params); err != nil {
+		logs.Error(err.Error())
+		if err = taskProgress.Progress(1, errors.New("加载数据文件失败--> error:"+err.Error()).Error(), progress.Error()); err != nil {
+			c.JSON(500, resp.Error(err, resp.Msg("任务失败")))
+			return
+		}
+		return
+	}
+	var get *cos.Response
+	var arr []model.EmbeddingAnalysis
+	var buf *bytes.Buffer
+	count := len(filelist)
+	base := 5.00
+	step := base / float64(count)
+	for _, file := range filelist {
+		split := len(config.Evn.App.Tencent.BucketURL)
+		get, err = oss.Tencent.Object.Get(context.Background(), file.FilePath[split:], nil)
+		if err != nil {
+			logs.Error(err.Error())
+			err = fmt.Errorf("%s 文件读取失败--> error:%s", file.FileName, err.Error())
+			if err = taskProgress.Progress(1, err.Error(), progress.Error()); err != nil {
+				c.JSON(500, resp.Error(err, resp.Msg("任务失败")))
+				return
+			}
+			return
+		}
+		buf = bytes.NewBuffer(nil)
+		io.Copy(buf, get.Body)
+		arr = append(arr, model.EmbeddingAnalysis{
+			AppChatKnowledgeFile: file,
+			FileBody:             buf.Bytes(),
+		})
+		get.Body.Close()
+		msg := fmt.Sprintf("加载 %s 数据文件..", file.FileName)
+		percent += step
+		if err = taskProgress.Progress(percent, msg); err != nil {
+			c.JSON(500, resp.Error(err, resp.Msg("任务失败")))
+			return
+		}
+	}
+	// 处理文件数据转化为纯文本
+	var db *chromem.DB
+	if db, err = chromem.NewPersistentDB("./chromemDB", false); err != nil {
+		if err = taskProgress.Progress(0, "向量存储初始化失败"); err != nil {
+			c.JSON(500, resp.Error(err, resp.Msg("任务失败")))
+			return
+		}
+	}
+
+	for i, docxs := range arr {
+		if arr[i].Lines, err = office.DocxToStringSlice(docxs.FileBody); err != nil {
+			err = fmt.Errorf("%s 文件解析失败--> error:%s", docxs.AppChatKnowledgeFile.FileName, err.Error())
+			if err = taskProgress.Progress(1, err.Error(), progress.Error()); err != nil {
+				c.JSON(500, resp.Error(err, resp.Msg("任务失败")))
+				return
+			}
+			return
+		}
+		count += len(arr[i].Lines)
+	}
+
+	// 计算进度步长
+
+	// 对文件内容进行向量化存储
+	instanceId := uuid.String()
+	var collection *chromem.Collection
+	if collection, err = db.GetOrCreateCollection(instanceId, nil, chromem.NewEmbeddingFuncOllama("nomic-embed-text", "")); err != nil {
+		if err = taskProgress.Progress(100, err.Error(), progress.Error()); err != nil {
+			c.JSON(500, resp.Error(err, resp.Msg("任务失败")))
+			return
+		}
+		return
+	}
+	count = len(arr)
+	base = 90.00
+	base = base / float64(count)
+	for _, file := range arr {
+		count = len(file.Lines)
+		step = base / float64(count)
+		//docs := make([]chromem.Document, 0, count)
+		for _, line := range file.Lines {
+			doc := chromem.Document{
+				ID:      uuid.String(),
+				Content: "search_document: " + line,
+			}
+			if err = collection.AddDocument(context.Background(), doc); err != nil {
+				logs.Error(err.Error())
+				err = fmt.Errorf("%s 文件解析失败--> error:%s", file.AppChatKnowledgeFile.FileName, err.Error())
+				if err = taskProgress.Progress(100, err.Error(), progress.Error()); err != nil {
+					c.JSON(500, resp.Error(err, resp.Msg("任务失败")))
+					return
+				}
+				return
+			}
+			msg := fmt.Sprintf("加载: %s 数据文件: %s", file.AppChatKnowledgeFile.FileName, line)
+			percent += step
+			if err = taskProgress.Progress(percent, msg); err != nil {
+				c.JSON(500, resp.Error(err, resp.Msg("任务失败")))
+				return
+			}
+		}
+	}
+
+	// 数据入库
+	files, _ := jsoniter.Marshal(args.Files)
+	instance := &model.AppChatKnowledgeInstance{
+		Id:                   instanceId,
+		UserId:               token.Id,
+		KnowledgeName:        args.Name,
+		KnowledgeFiles:       string(files),
+		KnowledgeDescription: args.Description,
+		KnowledgeType:        0,
+	}
+	if err = GptMapper.CreateKnowledge(instance); err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("生成失败")))
+		return
+	}
+	if err = taskProgress.Progress(100, "知识库生成成功"); err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("任务失败")))
+		return
+	}
+}
+
+func GetKnowledgeList(c *gin.Context) {
+	var err error
+	token := c.MustGet(auth.Key).(*auth.Token)
+	params := map[string]any{
+		"UserId": token.Id,
+	}
+	var list []*model.AppChatKnowledgeInstance
+	if list, err = GptMapper.KnowledgeList(params); err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("查询失败")))
+		return
+	}
+	c.JSON(200, resp.Success(list))
 }

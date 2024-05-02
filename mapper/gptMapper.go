@@ -34,8 +34,12 @@ type GptMapper struct {
 	GetUserAvatar  func(any) (string, error)
 	GetModelAvatar func(any) (string, error)
 
-	InsertKnowledge func(any) error
+	InsertKnowledgeFile func(any) error
 
 	// 查询知识库列表
-	KnowledgeList func(any) ([]*model.AppChatKnowledgeFile, error)
+	KnowledgeFileList     func(any) ([]*model.AppChatKnowledgeFile, error)
+	KnowledgeFileListById func(any) ([]*model.AppChatKnowledgeFile, error)
+	KnowledgeList         func(any) ([]*model.AppChatKnowledgeInstance, error)
+
+	CreateKnowledge func(any) error
 }
