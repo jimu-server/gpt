@@ -6,4 +6,4 @@ import (
 )
 
 var logs = logger.Logger
-var GptMapper = &mapper.GptMapper{}
+var GptMapper = mapper.Gpt

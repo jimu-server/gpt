@@ -1,4 +1,4 @@
-package control
+package args
 
 import "github.com/ollama/ollama/api"
 

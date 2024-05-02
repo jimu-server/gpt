@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jimu-server/common/resp"
 	"github.com/jimu-server/db"
+	args2 "github.com/jimu-server/gpt/args"
 	"github.com/jimu-server/middleware/auth"
 	"github.com/jimu-server/model"
 	"github.com/jimu-server/util/uuidutils/uuid"
@@ -14,7 +15,7 @@ import (
 
 func CreateConversation(c *gin.Context) {
 	var err error
-	var args CreateConversationArgs
+	var args args2.CreateConversationArgs
 	token := c.MustGet(auth.Key).(*auth.Token)
 	web.BindJSON(c, &args)
 	params := map[string]interface{}{
@@ -78,7 +79,7 @@ func GetConversationHistory(c *gin.Context) {
 
 func UpdateConversation(c *gin.Context) {
 	var err error
-	var args *CreateConversationArgs
+	var args *args2.CreateConversationArgs
 	web.BindJSON(c, args)
 	if err = GptMapper.CreateConversation(args); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("创建失败")))
@@ -89,7 +90,7 @@ func UpdateConversation(c *gin.Context) {
 
 func Send(c *gin.Context) {
 	var err error
-	var args SendMessageArgs
+	var args args2.SendMessageArgs
 	token := c.MustGet(auth.Key).(*auth.Token)
 	web.BindJSON(c, &args)
 	var begin *sql.Tx

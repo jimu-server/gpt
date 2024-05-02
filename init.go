@@ -4,6 +4,7 @@ import (
 	"embed"
 	"github.com/jimu-server/db"
 	"github.com/jimu-server/gpt/control"
+	"github.com/jimu-server/gpt/mapper"
 	"github.com/jimu-server/middleware/auth"
 	"github.com/jimu-server/web"
 )
@@ -13,7 +14,7 @@ var mapperFile embed.FS
 
 func init() {
 	db.GoBatis.LoadByRootPath("mapper", mapperFile)
-	db.GoBatis.ScanMappers(control.GptMapper)
+	db.GoBatis.ScanMappers(mapper.Gpt)
 
 	chat := web.Engine.Group("/api/chat", auth.Authorization())
 

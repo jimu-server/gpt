@@ -3,13 +3,13 @@ package control
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jimu-server/common/resp"
 	"github.com/jimu-server/config"
-	"github.com/jimu-server/db"
+	args2 "github.com/jimu-server/gpt/args"
+	"github.com/jimu-server/gpt/control/service"
 	"github.com/jimu-server/gpt/llmSdk"
 	"github.com/jimu-server/middleware/auth"
 	"github.com/jimu-server/model"
@@ -27,12 +27,11 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strings"
-	"time"
 )
 
 func Stream(c *gin.Context) {
 	var err error
-	var args ChatArgs
+	var args args2.ChatArgs
 	var send <-chan llmSdk.LLMStream[api.ChatResponse]
 	token := c.MustGet(auth.Key).(*auth.Token)
 	web.BindJSON(c, &args)
@@ -56,6 +55,7 @@ func Stream(c *gin.Context) {
 		buffer.WriteString(llmSdk.Segmentation)
 		_, err = c.Writer.Write(buffer.Bytes()) // 根据你的实际情况调整
 		if err != nil {
+			logs.Error(err.Error())
 			if err = data.Close(); err != nil {
 				logs.Error(err.Error())
 				break
@@ -67,57 +67,10 @@ func Stream(c *gin.Context) {
 		content.WriteString(msg)
 	}
 	contentStr := content.String()
-	var begin *sql.Tx
-	if begin, err = db.DB.Begin(); err != nil {
-		c.JSON(500, resp.Error(err, resp.Msg("开启事务失败")))
-		return
-	}
-	// 消息入库
-	picture := ""
-	if picture, err = GptMapper.GetModelAvatar(map[string]any{"Id": args.ModelId}); err != nil {
-		logs.Error(err.Error())
-		c.JSON(500, resp.Error(err, resp.Msg("发送失败")))
-		return
-	}
-	format := time.Now().Format("2006-01-02 15:04:05")
-	data := model.AppChatMessage{
-		Id:             args.Id,
-		ConversationId: args.ConversationId,
-		MessageId:      args.MessageId,
-		UserId:         token.Id,
-		ModelId:        args.ModelId,
-		Picture:        picture,
-		Role:           "assistant",
-		Content:        contentStr,
-		CreateTime:     format,
-	}
-	if err = GptMapper.CreateMessage(data, begin); err != nil {
-		logs.Error(err.Error())
-		c.JSON(500, resp.Error(err, resp.Msg("发送失败")))
-		return
-	}
-
-	update := model.AppChatConversationItem{
-		Id:         args.ConversationId,
-		Picture:    picture,
-		UserId:     "",
-		Title:      "",
-		LastModel:  args.Model,
-		LastMsg:    contentStr,
-		LastTime:   format,
-		CreateTime: "",
-	}
-	if err = GptMapper.UpdateConversationLastMsg(update, begin); err != nil {
-		logs.Error(err.Error())
-		if err = begin.Rollback(); err != nil {
-			logs.Error(err.Error())
-			c.JSON(500, resp.Error(err, resp.Msg("消息回复失败")))
-			return
-		}
+	if err = service.ChatUpdate(token, args, contentStr); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("消息回复失败")))
 		return
 	}
-	begin.Commit()
 }
 
 func GetLLmModel(c *gin.Context) {
@@ -195,7 +148,7 @@ func PullLLmModel(c *gin.Context) {
 
 func CreateLLmModel(c *gin.Context) {
 	var err error
-	var args *CreateModel
+	var args *args2.CreateModel
 	var send <-chan llmSdk.LLMStream[api.ProgressResponse]
 	web.BindJSON(c, &args)
 	token := c.MustGet(auth.Key).(*auth.Token)
@@ -328,7 +281,7 @@ func CreateKnowledgeFile(c *gin.Context) {
 		c.JSON(500, resp.Error(err, resp.Msg("上传失败")))
 		return
 	}
-	args := KnowledgeArgs{
+	args := args2.KnowledgeArgs{
 		Pid:     form.Value["pid"][0],
 		Folders: form.Value["folders"],
 	}
@@ -422,7 +375,7 @@ func UpdateKnowledge(c *gin.Context) {
 func GenKnowledge(c *gin.Context) {
 	var err error
 	token := c.MustGet(auth.Key).(*auth.Token)
-	var args *GenKnowledgeArgs
+	var args *args2.GenKnowledgeArgs
 	var percent float64 = 0
 	web.BindJSON(c, &args)
 	taskProgress, err := progress.NewProgress(c.Writer)
