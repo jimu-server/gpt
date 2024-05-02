@@ -5,7 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jimu-server/common/resp"
 	"github.com/jimu-server/db"
-	args2 "github.com/jimu-server/gpt/args"
+	"github.com/jimu-server/gpt/args"
 	"github.com/jimu-server/middleware/auth"
 	"github.com/jimu-server/model"
 	"github.com/jimu-server/util/uuidutils/uuid"
@@ -15,13 +15,13 @@ import (
 
 func CreateConversation(c *gin.Context) {
 	var err error
-	var args args2.CreateConversationArgs
+	var reqParams args.CreateConversationArgs
 	token := c.MustGet(auth.Key).(*auth.Token)
-	web.BindJSON(c, &args)
+	web.BindJSON(c, &reqParams)
 	params := map[string]interface{}{
 		"Id":     uuid.String(),
 		"UserId": token.Id,
-		"Title":  args.Title,
+		"Title":  reqParams.Title,
 	}
 	if err = GptMapper.CreateConversation(params); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("创建失败")))
@@ -32,11 +32,11 @@ func CreateConversation(c *gin.Context) {
 
 func DelConversation(c *gin.Context) {
 	var err error
-	var args map[string]string
-	web.BindJSON(c, &args)
+	var reqParams map[string]string
+	web.BindJSON(c, &reqParams)
 	token := c.MustGet(auth.Key).(*auth.Token)
-	args["UserId"] = token.Id
-	if err = GptMapper.DelConversation(args); err != nil {
+	reqParams["UserId"] = token.Id
+	if err = GptMapper.DelConversation(reqParams); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("创建失败")))
 		return
 	}
@@ -79,20 +79,20 @@ func GetConversationHistory(c *gin.Context) {
 
 func UpdateConversation(c *gin.Context) {
 	var err error
-	var args *args2.CreateConversationArgs
-	web.BindJSON(c, args)
-	if err = GptMapper.CreateConversation(args); err != nil {
+	var reqParams *args.CreateConversationArgs
+	web.BindJSON(c, reqParams)
+	if err = GptMapper.CreateConversation(reqParams); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("创建失败")))
 		return
 	}
-	c.JSON(200, resp.Success(args, resp.Msg("创建成功")))
+	c.JSON(200, resp.Success(reqParams, resp.Msg("创建成功")))
 }
 
 func Send(c *gin.Context) {
 	var err error
-	var args args2.SendMessageArgs
+	var reqParams args.SendMessageArgs
 	token := c.MustGet(auth.Key).(*auth.Token)
-	web.BindJSON(c, &args)
+	web.BindJSON(c, &reqParams)
 	var begin *sql.Tx
 	if begin, err = db.DB.Begin(); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("开启事务失败")))
@@ -105,18 +105,18 @@ func Send(c *gin.Context) {
 		return
 	}
 	id := uuid.String()
-	if args.MessageId == "" {
-		args.MessageId = id
+	if reqParams.MessageId == "" {
+		reqParams.MessageId = id
 	}
 	data := model.AppChatMessage{
 		Id:             id,
-		ConversationId: args.ConversationId,
-		MessageId:      args.MessageId,
+		ConversationId: reqParams.ConversationId,
+		MessageId:      reqParams.MessageId,
 		UserId:         token.Id,
-		ModelId:        args.ModelId,
+		ModelId:        reqParams.ModelId,
 		Picture:        avatar,
 		Role:           "user",
-		Content:        args.Content,
+		Content:        reqParams.Content,
 		CreateTime:     time.Now().Format("2006-01-02 15:04:05"),
 	}
 	if err = GptMapper.CreateMessage(data, begin); err != nil {

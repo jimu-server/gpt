@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jimu-server/common/resp"
 	"github.com/jimu-server/config"
-	args2 "github.com/jimu-server/gpt/args"
+	args "github.com/jimu-server/gpt/args"
 	"github.com/jimu-server/gpt/control/service"
 	"github.com/jimu-server/gpt/llmSdk"
 	"github.com/jimu-server/middleware/auth"
@@ -31,11 +31,11 @@ import (
 
 func Stream(c *gin.Context) {
 	var err error
-	var args args2.ChatArgs
+	var params args.ChatArgs
 	var send <-chan llmSdk.LLMStream[api.ChatResponse]
 	token := c.MustGet(auth.Key).(*auth.Token)
-	web.BindJSON(c, &args)
-	if send, err = llmSdk.Chat[api.ChatResponse](args.ChatRequest); err != nil {
+	web.BindJSON(c, &params)
+	if send, err = llmSdk.Chat[api.ChatResponse](params.ChatRequest); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("消息回复失败")))
 		return
 	}
@@ -67,7 +67,7 @@ func Stream(c *gin.Context) {
 		content.WriteString(msg)
 	}
 	contentStr := content.String()
-	if err = service.ChatUpdate(token, args, contentStr); err != nil {
+	if err = service.ChatUpdate(token, params, contentStr); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("消息回复失败")))
 		return
 	}
@@ -87,12 +87,12 @@ func GetLLmModel(c *gin.Context) {
 
 func PullLLmModel(c *gin.Context) {
 	var err error
-	var args *api.PullRequest
+	var reqParams *api.PullRequest
 	var flag bool
 	var send <-chan llmSdk.LLMStream[api.ProgressResponse]
-	web.BindJSON(c, &args)
+	web.BindJSON(c, &reqParams)
 	params := map[string]any{
-		"Model": args.Name,
+		"Model": reqParams.Name,
 		"Flag":  true,
 	}
 	// 检查模型是否已经下载
@@ -106,7 +106,7 @@ func PullLLmModel(c *gin.Context) {
 		c.JSON(200, resp.Success(nil))
 		return
 	}
-	if send, err = llmSdk.Pull[api.ProgressResponse](args); err != nil {
+	if send, err = llmSdk.Pull[api.ProgressResponse](reqParams); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("拉取失败")))
 		return
 	}
@@ -148,14 +148,14 @@ func PullLLmModel(c *gin.Context) {
 
 func CreateLLmModel(c *gin.Context) {
 	var err error
-	var args *args2.CreateModel
+	var req_params *args.CreateModel
 	var send <-chan llmSdk.LLMStream[api.ProgressResponse]
-	web.BindJSON(c, &args)
+	web.BindJSON(c, &req_params)
 	token := c.MustGet(auth.Key).(*auth.Token)
 	// 检查模型是否存在
 	var modelIbfo bool
 	params := map[string]any{
-		"Model": args.Name,
+		"Model": req_params.Name,
 	}
 	if modelIbfo, err = GptMapper.ModelExists(params); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("模型已存在")))
@@ -167,7 +167,7 @@ func CreateLLmModel(c *gin.Context) {
 	}
 
 	var baseModeInfo *model.LLmModel
-	params["Model"] = args.BaseModel
+	params["Model"] = req_params.BaseModel
 	if baseModeInfo, err = GptMapper.ModelInfo(params); err != nil {
 		logs.Error(err.Error())
 		c.JSON(500, resp.Error(err, resp.Msg("模型创建失败")))
@@ -179,7 +179,7 @@ func CreateLLmModel(c *gin.Context) {
 		c.JSON(500, resp.Error(nil, resp.Msg("模型已被删除")))
 	}
 
-	if send, err = llmSdk.CreateModel[api.ProgressResponse](args.CreateRequest); err != nil {
+	if send, err = llmSdk.CreateModel[api.ProgressResponse](req_params.CreateRequest); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("模型创建失败")))
 		return
 	}
@@ -209,8 +209,8 @@ func CreateLLmModel(c *gin.Context) {
 		progressResponse := data.Data()
 		if progressResponse.Status == "success" {
 			// 更新模型下载情况
-			baseModeInfo.Name = args.Name
-			baseModeInfo.Model = args.Name
+			baseModeInfo.Name = req_params.Name
+			baseModeInfo.Model = req_params.Name
 			baseModeInfo.UserId = token.Id
 			baseModeInfo.Pid = baseModeInfo.Id
 			baseModeInfo.Id = uuid.String()
@@ -228,12 +228,12 @@ func CreateLLmModel(c *gin.Context) {
 
 func DeleteLLmModel(c *gin.Context) {
 	var err error
-	var args *api.DeleteRequest
+	var req_params *api.DeleteRequest
 	var flag bool
-	web.BindJSON(c, &args)
+	web.BindJSON(c, &req_params)
 	// 修改模型下载状态
 	params := map[string]any{
-		"Model": args.Name,
+		"Model": req_params.Name,
 		"Flag":  false,
 	}
 	if flag, err = GptMapper.SelectModelStatus(params); err != nil {
@@ -246,7 +246,7 @@ func DeleteLLmModel(c *gin.Context) {
 		c.JSON(200, resp.Success(nil))
 		return
 	}
-	if err = llmSdk.DeleteModel(args); err != nil {
+	if err = llmSdk.DeleteModel(req_params); err != nil {
 		logs.Error(err.Error())
 		c.JSON(500, resp.Error(err, resp.Msg("ollama模型删除失败")))
 		return
@@ -281,17 +281,17 @@ func CreateKnowledgeFile(c *gin.Context) {
 		c.JSON(500, resp.Error(err, resp.Msg("上传失败")))
 		return
 	}
-	args := args2.KnowledgeArgs{
+	req_params := args.KnowledgeArgs{
 		Pid:     form.Value["pid"][0],
 		Folders: form.Value["folders"],
 	}
 
 	// 处理文件夹创建
-	if len(args.Folders) > 0 {
-		for _, v := range args.Folders {
+	if len(req_params.Folders) > 0 {
+		for _, v := range req_params.Folders {
 			list = append(list, &model.AppChatKnowledgeFile{
 				Id:       uuid.String(),
-				Pid:      args.Pid,
+				Pid:      req_params.Pid,
 				UserId:   token.Id,
 				FileName: v,
 				FileType: 0,
@@ -323,7 +323,7 @@ func CreateKnowledgeFile(c *gin.Context) {
 			full := fmt.Sprintf("%s/%s", config.Evn.App.Tencent.BucketURL, name)
 			list = append(list, &model.AppChatKnowledgeFile{
 				Id:       id,
-				Pid:      args.Pid,
+				Pid:      req_params.Pid,
 				UserId:   token.Id,
 				FileName: file.Filename,
 				FilePath: full,
@@ -375,15 +375,15 @@ func UpdateKnowledge(c *gin.Context) {
 func GenKnowledge(c *gin.Context) {
 	var err error
 	token := c.MustGet(auth.Key).(*auth.Token)
-	var args *args2.GenKnowledgeArgs
+	var req_params *args.GenKnowledgeArgs
 	var percent float64 = 0
-	web.BindJSON(c, &args)
+	web.BindJSON(c, &req_params)
 	taskProgress, err := progress.NewProgress(c.Writer)
 	if err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("任务失败")))
 		return
 	}
-	if len(args.Files) == 0 {
+	if len(req_params.Files) == 0 {
 		percent = 100
 		if err = taskProgress.Progress(percent, "完成"); err != nil {
 			c.JSON(500, resp.Error(err, resp.Msg("任务失败")))
@@ -399,7 +399,7 @@ func GenKnowledge(c *gin.Context) {
 	var filelist []*model.AppChatKnowledgeFile
 	params := map[string]any{
 		"UserId": token.Id,
-		"list":   args.Files,
+		"list":   req_params.Files,
 	}
 	// 解析文件内容
 	if filelist, err = GptMapper.KnowledgeFileListById(params); err != nil {
@@ -463,8 +463,6 @@ func GenKnowledge(c *gin.Context) {
 		count += len(arr[i].Lines)
 	}
 
-	// 计算进度步长
-
 	// 对文件内容进行向量化存储
 	instanceId := uuid.String()
 	var collection *chromem.Collection
@@ -506,13 +504,13 @@ func GenKnowledge(c *gin.Context) {
 	}
 
 	// 数据入库
-	files, _ := jsoniter.Marshal(args.Files)
+	files, _ := jsoniter.Marshal(req_params.Files)
 	instance := &model.AppChatKnowledgeInstance{
 		Id:                   instanceId,
 		UserId:               token.Id,
-		KnowledgeName:        args.Name,
+		KnowledgeName:        req_params.Name,
 		KnowledgeFiles:       string(files),
-		KnowledgeDescription: args.Description,
+		KnowledgeDescription: req_params.Description,
 		KnowledgeType:        0,
 	}
 	if err = GptMapper.CreateKnowledge(instance); err != nil {
