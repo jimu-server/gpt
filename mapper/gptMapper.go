@@ -21,6 +21,7 @@ type GptMapper struct {
 	CreateModel       func(any) error
 
 	CreateMessage func(any, *sql.Tx) error
+	DeleteMessage func(any) error
 
 	// 查询用户可用模型
 	ModelList func(any) ([]model.LLmModel, error)

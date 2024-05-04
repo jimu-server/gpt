@@ -30,47 +30,9 @@ import (
 )
 
 func Stream(c *gin.Context) {
-	var err error
 	var params args.ChatArgs
-	var send <-chan llmSdk.LLMStream[api.ChatResponse]
-	token := c.MustGet(auth.Key).(*auth.Token)
 	web.BindJSON(c, &params)
-	if send, err = llmSdk.Chat[api.ChatResponse](params.ChatRequest); err != nil {
-		c.JSON(500, resp.Error(err, resp.Msg("消息回复失败")))
-		return
-	}
-	c.Writer.Header().Set("Content-Type", "text/event-stream")
-	c.Writer.Header().Set("Cache-Control", "no-cache")
-	c.Writer.Header().Set("Connection", "keep-alive")
-	flusher, ok := c.Writer.(http.Flusher)
-	if !ok {
-		c.JSON(500, resp.Error(err, resp.Msg("消息回复失败")))
-		return
-	}
-	content := bytes.NewBuffer(nil)
-	//now := time.Now()
-	for data := range send {
-		v := data.Data()
-		buffer := data.Body()
-		buffer.WriteString(llmSdk.Segmentation)
-		_, err = c.Writer.Write(buffer.Bytes()) // 根据你的实际情况调整
-		if err != nil {
-			logs.Error(err.Error())
-			if err = data.Close(); err != nil {
-				logs.Error(err.Error())
-				break
-			}
-			break // 如果写入失败，结束函数
-		}
-		flusher.Flush() // 立即将缓冲数据发送给客户端
-		msg := v.Message.Content
-		content.WriteString(msg)
-	}
-	contentStr := content.String()
-	if err = service.ChatUpdate(token, params, contentStr); err != nil {
-		c.JSON(500, resp.Error(err, resp.Msg("消息回复失败")))
-		return
-	}
+	service.SendChatStreamMessage(c, params)
 }
 
 func GetLLmModel(c *gin.Context) {
@@ -364,11 +326,11 @@ func GetKnowledgeFileList(c *gin.Context) {
 	c.JSON(200, resp.Success(trees))
 }
 
-func DeleteKnowledge(c *gin.Context) {
+func DeleteKnowledgeFile(c *gin.Context) {
 
 }
 
-func UpdateKnowledge(c *gin.Context) {
+func UpdateKnowledgeFile(c *gin.Context) {
 
 }
 

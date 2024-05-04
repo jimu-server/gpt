@@ -144,3 +144,18 @@ func GetMessageItem(c *gin.Context) {
 	}
 	c.JSON(200, resp.Success(data, resp.Msg("查询成功")))
 }
+
+func DeleteMessage(c *gin.Context) {
+	var err error
+	var reqParams args.DeleteChatMsg
+	token := c.MustGet(auth.Key).(*auth.Token)
+	web.BindJSON(c, &reqParams)
+	params := map[string]interface{}{
+		"Id":     reqParams.Id,
+		"UserId": token.Id,
+	}
+	if err = GptMapper.DeleteMessage(params); err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("删除失败")))
+		return
+	}
+}

@@ -42,6 +42,13 @@
         VALUES ({Id}, {ConversationId}, {MessageId}, {UserId}, {ModelId}, {Picture}, {Role}, {Content}, {CreateTime})
     </insert>
 
+    <delete id="DeleteMessage">
+        delete
+        from app_chat_message
+        where id = {Id}
+          and user_id = {UserId}
+    </delete>
+
     <select id="SelectMessageItem">
         select *
         from app_chat_message

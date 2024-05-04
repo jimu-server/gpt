@@ -1,13 +1,19 @@
 package service
 
 import (
+	"bytes"
 	"database/sql"
+	"github.com/gin-gonic/gin"
+	"github.com/jimu-server/common/resp"
 	"github.com/jimu-server/db"
 	"github.com/jimu-server/gpt/args"
+	"github.com/jimu-server/gpt/llmSdk"
 	"github.com/jimu-server/gpt/mapper"
 	"github.com/jimu-server/logger"
 	"github.com/jimu-server/middleware/auth"
 	"github.com/jimu-server/model"
+	"github.com/ollama/ollama/api"
+	"net/http"
 	"time"
 )
 
@@ -62,4 +68,48 @@ func ChatUpdate(token *auth.Token, args args.ChatArgs, content string) error {
 		return err
 	}
 	return begin.Commit()
+}
+
+// SendChatStreamMessage 聊天流消息
+func SendChatStreamMessage(c *gin.Context, params args.ChatArgs) {
+	var err error
+	var send <-chan llmSdk.LLMStream[api.ChatResponse]
+	token := c.MustGet(auth.Key).(*auth.Token)
+	if send, err = llmSdk.Chat[api.ChatResponse](params.ChatRequest); err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("消息回复失败")))
+		return
+	}
+	// 写入流式响应头
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		c.JSON(500, resp.Error(err, resp.Msg("消息回复失败")))
+		return
+	}
+	content := bytes.NewBuffer(nil)
+	//now := time.Now()
+	for data := range send {
+		v := data.Data()
+		buffer := data.Body()
+		buffer.WriteString(llmSdk.Segmentation)
+		_, err = c.Writer.Write(buffer.Bytes()) // 根据你的实际情况调整
+		if err != nil {
+			logs.Error(err.Error())
+			if err = data.Close(); err != nil {
+				logs.Error(err.Error())
+				break
+			}
+			break // 如果写入失败，结束函数
+		}
+		flusher.Flush() // 立即将缓冲数据发送给客户端
+		msg := v.Message.Content
+		content.WriteString(msg)
+	}
+	contentStr := content.String()
+	if err = ChatUpdate(token, params, contentStr); err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("消息回复失败")))
+		return
+	}
 }
