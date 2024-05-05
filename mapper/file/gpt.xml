@@ -71,10 +71,18 @@
     <update id="UpdateModelDownloadStatus">
         update app_chat_model
         set is_download={Flag}
-        where model = {Model}
+        where id = {Id}
+          and user_id = {UserId}
     </update>
 
-    <select id="SelectModelStatus">
+    <delete id="DeleteModel">
+        delete
+        from app_chat_model
+        where id = {Id}
+          and user_id = {UserId}
+    </delete>
+
+    <select id="SelectModel">
         select is_download
         from app_chat_model
         where model = {Model}

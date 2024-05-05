@@ -15,10 +15,10 @@ type GptMapper struct {
 	ConversationHistory       func(any) ([]model.AppChatMessage, error)
 	UpdateConversationLastMsg func(any, *sql.Tx) error
 
-	SelectModelStatus func(any) (bool, error)
-	ModelExists       func(any) (bool, error)
-	ModelInfo         func(any) (*model.LLmModel, error)
-	CreateModel       func(any) error
+	SelectModel func(any) (*model.LLmModel, error)
+	ModelExists func(any) (bool, error)
+	ModelInfo   func(any) (*model.LLmModel, error)
+	CreateModel func(any) error
 
 	CreateMessage func(any, *sql.Tx) error
 	DeleteMessage func(any) error
@@ -31,6 +31,8 @@ type GptMapper struct {
 
 	// 更新模型状态
 	UpdateModelDownloadStatus func(any) error
+
+	DeleteModel func(any) error
 
 	GetUserAvatar  func(any) (string, error)
 	GetModelAvatar func(any) (string, error)
