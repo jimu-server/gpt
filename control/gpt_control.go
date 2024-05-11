@@ -158,4 +158,5 @@ func DeleteMessage(c *gin.Context) {
 		c.JSON(500, resp.Error(err, resp.Msg("删除失败")))
 		return
 	}
+	c.JSON(200, resp.Success(nil, resp.Msg("删除成功")))
 }
