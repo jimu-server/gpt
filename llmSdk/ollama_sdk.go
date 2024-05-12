@@ -102,7 +102,7 @@ func Pull[T any](req *api.PullRequest) (DataEvent[T], error) {
 
 // ModelInfo
 // 获取模型信息
-func ModelInfo(req *api.ShowRequest) (*api.ShowResponse, error) {
+func ModelInfo(server string, req *api.ShowRequest) (*api.ShowResponse, error) {
 	client := pool.Get().(*http.Client)
 	var err error
 	var request *http.Request
@@ -111,7 +111,7 @@ func ModelInfo(req *api.ShowRequest) (*api.ShowResponse, error) {
 		return nil, err
 	}
 	buffer := bytes.NewBuffer(marshal)
-	url := fmt.Sprintf("http://%s:%s/api/show", ollama_host, ollama_port)
+	url := fmt.Sprintf("http://%s/api/show", server)
 	request, err = http.NewRequest(http.MethodPost, url, buffer)
 	if err != nil {
 		return nil, err
@@ -121,6 +121,30 @@ func ModelInfo(req *api.ShowRequest) (*api.ShowResponse, error) {
 		return nil, err
 	}
 	var data *api.ShowResponse
+	var readAll []byte
+	if readAll, err = io.ReadAll(do.Body); err != nil {
+		return nil, err
+	}
+	if err = jsoniter.Unmarshal(readAll, &data); err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func ModelList(server string) (*api.ListResponse, error) {
+	client := pool.Get().(*http.Client)
+	var err error
+	var request *http.Request
+	url := fmt.Sprintf("%s/api/tags", server)
+	request, err = http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	do, err := client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	var data *api.ListResponse
 	var readAll []byte
 	if readAll, err = io.ReadAll(do.Body); err != nil {
 		return nil, err
