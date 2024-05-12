@@ -14,7 +14,6 @@ import (
 	"github.com/jimu-server/middleware/auth"
 	"github.com/jimu-server/model"
 	"github.com/jimu-server/office"
-
 	"github.com/jimu-server/oss"
 	"github.com/jimu-server/util/treeutils/tree"
 	"github.com/jimu-server/util/uuidutils/uuid"
@@ -46,6 +45,14 @@ func GetLLmModel(c *gin.Context) {
 		return
 	}
 	c.JSON(200, resp.Success(models))
+
+	// 获取用户的 GPT 设置
+	//
+	//useSetting, err := setting.GetUseSetting[*model.OllamaSetting](token.Id, "Ollama")
+	//if err != nil {
+	//	return
+	//}
+
 }
 
 func PullLLmModel(c *gin.Context) {
