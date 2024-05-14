@@ -196,47 +196,47 @@ func CreateLLmModel(c *gin.Context) {
 
 func DeleteLLmModel(c *gin.Context) {
 	var err error
-	var req_params *api.DeleteRequest
-	var flag *model.LLmModel
-	web.BindJSON(c, &req_params)
-	token := c.MustGet(auth.Key).(*auth.Token)
-	// 修改模型下载状态
-	params := map[string]any{
-		"Model":  req_params.Name,
-		"Flag":   false,
-		"UserId": token.Id,
-	}
-	if flag, err = GptMapper.SelectModel(params); err != nil {
-		logs.Error(err.Error())
-		c.JSON(500, resp.Error(err, resp.Msg("删除失败")))
-		return
-	}
-	// 模型已删除 直接返回成功
-	if !flag.IsDownload {
-		c.JSON(200, resp.Success(nil))
-		return
-	}
-	if err = llmSdk.DeleteModel(req_params); err != nil {
+	var reqParams *api.DeleteRequest
+	//var flag *model.LLmModel
+	web.BindJSON(c, &reqParams)
+	//token := c.MustGet(auth.Key).(*auth.Token)
+	//// 修改模型下载状态
+	//params := map[string]any{
+	//	"Model":  reqParams.Name,
+	//	"Flag":   false,
+	//	"UserId": token.Id,
+	//}
+	//if flag, err = GptMapper.SelectModel(params); err != nil {
+	//	logs.Error(err.Error())
+	//	c.JSON(500, resp.Error(err, resp.Msg("删除失败")))
+	//	return
+	//}
+	//// 模型已删除 直接返回成功
+	//if !flag.IsDownload {
+	//	c.JSON(200, resp.Success(nil))
+	//	return
+	//}
+	if err = llmSdk.DeleteModel(reqParams); err != nil {
 		logs.Error(err.Error())
 		c.JSON(500, resp.Error(err, resp.Msg("ollama模型删除失败")))
 		return
 	}
-	params["Id"] = flag.Id
-	if flag.Id == flag.Pid {
-		// 判断如果是系统内置模型 直接修改状态
-		if err = GptMapper.UpdateModelDownloadStatus(params); err != nil {
-			logs.Error(err.Error())
-			c.JSON(500, resp.Error(err, resp.Msg("模型删除失败")))
-			return
-		}
-	} else {
-		// 如果是用户自定义模型 则删除数据库记录
-		if err = GptMapper.DeleteModel(params); err != nil {
-			logs.Error(err.Error())
-			c.JSON(500, resp.Error(err, resp.Msg("模型删除失败")))
-			return
-		}
-	}
+	//params["Id"] = flag.Id
+	//if flag.Id == flag.Pid {
+	//	// 判断如果是系统内置模型 直接修改状态
+	//	if err = GptMapper.UpdateModelDownloadStatus(params); err != nil {
+	//		logs.Error(err.Error())
+	//		c.JSON(500, resp.Error(err, resp.Msg("模型删除失败")))
+	//		return
+	//	}
+	//} else {
+	//	// 如果是用户自定义模型 则删除数据库记录
+	//	if err = GptMapper.DeleteModel(params); err != nil {
+	//		logs.Error(err.Error())
+	//		c.JSON(500, resp.Error(err, resp.Msg("模型删除失败")))
+	//		return
+	//	}
+	//}
 
 	// 如果使用户自建模型则直接删除
 

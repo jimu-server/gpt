@@ -175,7 +175,11 @@ func DeleteModel(req *api.DeleteRequest) error {
 	if do.StatusCode == http.StatusOK {
 		return nil
 	}
-	return errors.New("删除失败")
+	var readAll []byte
+	if readAll, err = io.ReadAll(do.Body); err != nil {
+		return err
+	}
+	return errors.New(string(readAll))
 }
 
 func CreateModel[T any](req *api.CreateRequest) (DataEvent[T], error) {
