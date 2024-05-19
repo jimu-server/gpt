@@ -51,6 +51,5 @@ type GenKnowledgeArgs struct {
 }
 
 type DeleteChatMsg struct {
-	Id  string   `json:"id" form:"id"`
 	Ids []string `json:"ids" form:"ids"`
 }

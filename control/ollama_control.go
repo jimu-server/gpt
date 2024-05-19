@@ -56,24 +56,24 @@ func GetLLmModel(c *gin.Context) {
 func PullLLmModel(c *gin.Context) {
 	var err error
 	var reqParams *api.PullRequest
-	var flag *model.LLmModel
+	//var flag *model.LLmModel
 	var send <-chan llmSdk.LLMStream[api.ProgressResponse]
 	web.BindJSON(c, &reqParams)
-	params := map[string]any{
-		"Model": reqParams.Name,
-		"Flag":  true,
-	}
+	//params := map[string]any{
+	//	"Model": reqParams.Name,
+	//	"Flag":  true,
+	//}
 	// 检查模型是否已经下载
-	if flag, err = GptMapper.SelectModel(params); err != nil {
-		logs.Error(err.Error())
-		c.JSON(500, resp.Error(err, resp.Msg("下载失败")))
-		return
-	}
+	//if flag, err = GptMapper.SelectModel(params); err != nil {
+	//	logs.Error(err.Error())
+	//	c.JSON(500, resp.Error(err, resp.Msg("下载失败")))
+	//	return
+	//}
 	// 模型以下载
-	if flag.IsDownload {
-		c.JSON(200, resp.Success(nil))
-		return
-	}
+	//if flag.IsDownload {
+	//	c.JSON(200, resp.Success(nil))
+	//	return
+	//}
 	if send, err = llmSdk.Pull[api.ProgressResponse](reqParams); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("拉取失败")))
 		return
@@ -101,16 +101,16 @@ func PullLLmModel(c *gin.Context) {
 			return // 如果写入失败，结束函数
 		}
 		flusher.Flush() // 立即将缓冲数据发送给客户端
-		progressResponse := data.Data()
-		if progressResponse.Status == "success" {
-			// 更新模型下载情况
-			if err = GptMapper.UpdateModelDownloadStatus(params); err != nil {
-				logs.Error("模型拉取数据库状态更新失败")
-				logs.Error(err.Error())
-				c.JSON(500, resp.Error(err, resp.Msg("模型下载失败")))
-				return
-			}
-		}
+		//progressResponse := data.Data()
+		//if progressResponse.Status == "success" {
+		//	// 更新模型下载情况
+		//	if err = GptMapper.UpdateModelDownloadStatus(params); err != nil {
+		//		logs.Error("模型拉取数据库状态更新失败")
+		//		logs.Error(err.Error())
+		//		c.JSON(500, resp.Error(err, resp.Msg("模型下载失败")))
+		//		return
+		//	}
+		//}
 	}
 }
 

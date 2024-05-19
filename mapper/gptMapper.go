@@ -9,8 +9,11 @@ type GptMapper struct {
 	SelectMessageItem func(any) (*model.AppChatMessage, error)
 
 	// 创建会话
-	CreateConversation        func(any) error
-	DelConversation           func(any) error
+	CreateConversation func(any) error
+	// 删除会话
+	DelConversation func(any, *sql.Tx) error
+	// 删除会话的所有消息
+	DeleteConversationMessage func(any, *sql.Tx) error
 	ConversationList          func(any) ([]model.AppChatConversationItem, error)
 	ConversationHistory       func(any) ([]model.AppChatMessage, error)
 	UpdateConversationLastMsg func(any, *sql.Tx) error
@@ -21,6 +24,7 @@ type GptMapper struct {
 	CreateModel func(any) error
 
 	CreateMessage func(any, *sql.Tx) error
+	// 删除消息
 	DeleteMessage func(any) error
 
 	// 查询用户可用模型

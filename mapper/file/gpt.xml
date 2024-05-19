@@ -6,16 +6,25 @@
     </insert>
 
     <delete id="DelConversation">
-        delete
-        from app_chat_conversation
+        update
+        app_chat_conversation
+        set delete=1
         where user_id = {UserId}
           and id = {Id};
+    </delete>
+
+    <delete id="DeleteConversationMessage">
+        update
+            app_chat_message
+        set delete=1
+        where user_id = {UserId}
+          and conversation_id = {Id};
     </delete>
 
     <select id="ConversationList">
         select *
         from app_chat_conversation
-        where user_id = {UserId}
+        where user_id = {UserId} and delete=0
         order by create_time;
     </select>
 
@@ -23,7 +32,7 @@
         select *
         from app_chat_message
         where user_id = {UserId}
-          and conversation_id = {ConversationId}
+          and conversation_id = {ConversationId} and delete=0
         order by create_time
     </select>
 
@@ -43,10 +52,13 @@
     </insert>
 
     <delete id="DeleteMessage">
-        delete
-        from app_chat_message
-        where id = {Id}
-          and user_id = {UserId}
+        update
+            app_chat_message
+        set delete=1
+        where user_id = {UserId} and id in
+        <for slice="{list}" item="id" open="(" separator="," close=")">
+            {id}
+        </for>
     </delete>
 
     <select id="SelectMessageItem">
