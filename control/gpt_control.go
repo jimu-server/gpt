@@ -138,10 +138,6 @@ func Send(c *gin.Context) {
 	c.JSON(200, resp.Success(data, resp.Msg("发送成功")))
 }
 
-func GetUid(c *gin.Context) {
-	c.JSON(200, resp.Success(uuid.String(), resp.Msg("获取成功")))
-}
-
 func GetMessageItem(c *gin.Context) {
 	var err error
 	id := c.Query("id")
