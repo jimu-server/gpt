@@ -59,21 +59,6 @@ func PullLLmModel(c *gin.Context) {
 	//var flag *model.LLmModel
 	var send <-chan llmSdk.LLMStream[api.ProgressResponse]
 	web.BindJSON(c, &reqParams)
-	//params := map[string]any{
-	//	"Model": reqParams.Name,
-	//	"Flag":  true,
-	//}
-	// 检查模型是否已经下载
-	//if flag, err = GptMapper.SelectModel(params); err != nil {
-	//	logs.Error(err.Error())
-	//	c.JSON(500, resp.Error(err, resp.Msg("下载失败")))
-	//	return
-	//}
-	// 模型以下载
-	//if flag.IsDownload {
-	//	c.JSON(200, resp.Success(nil))
-	//	return
-	//}
 	if send, err = llmSdk.Pull[api.ProgressResponse](reqParams); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("拉取失败")))
 		return

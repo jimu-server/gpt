@@ -18,17 +18,17 @@ func init() {
 
 	chat := web.Engine.Group("/api/chat", auth.Authorization())
 
-	chat.GET("/model/list", control.GetLLmModel)                      // 获取模型
-	chat.POST("/model/pull", control.PullLLmModel)                    // 获取模型
-	chat.POST("/model/delete", control.DeleteLLmModel)                // 删除模型
-	chat.POST("/user/model/create", control.CreateLLmModel)           // 创建模型
-	chat.POST("/user/model/delete", control.DeleteLLmModel)           // 删除用户模型
+	chat.GET("/model/list", control.GetLLmModel)                      // 获取模型 可以走第三方获取
+	chat.POST("/model/pull", control.PullLLmModel)                    // 获取模型 只能操作本地
+	chat.POST("/model/delete", control.DeleteLLmModel)                // 删除模型 只能操作本地
+	chat.POST("/user/model/create", control.CreateLLmModel)           // 创建模型 只能操作本地
+	chat.POST("/user/model/delete", control.DeleteLLmModel)           // 删除用户模型  只能操作本地
 	chat.POST("/conversation/create", control.CreateConversation)     // 创建会话
 	chat.POST("/conversation/del", control.DelConversation)           // 删除会话
 	chat.GET("/conversation/get", control.GetConversation)            // 查询会话列表
 	chat.GET("/conversation/message", control.GetConversationHistory) // 查询会话历史数据
 	chat.POST("/conversation/update", control.UpdateConversation)     // 修改会话
-	chat.POST("/conversation", control.Stream)                        // 获取消息流回答
+	chat.POST("/conversation", control.Stream)                        // 获取消息流回答  可以走第三方获取
 	chat.POST("/send", control.Send)                                  // 发送消息
 	chat.GET("/msg", control.GetMessageItem)                          // 查询指定消息
 	chat.POST("/msg/delete", control.DeleteMessage)                   // 删除消息
