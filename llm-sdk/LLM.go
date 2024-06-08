@@ -1,4 +1,4 @@
-package llmSdk
+package llm_sdk
 
 import (
 	"bytes"

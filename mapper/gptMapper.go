@@ -6,6 +6,8 @@ import (
 )
 
 type GptMapper struct {
+	InitCheck func() (int64, error)
+
 	SelectMessageItem func(any) (*model.AppChatMessage, error)
 
 	// 创建会话

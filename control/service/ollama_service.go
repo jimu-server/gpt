@@ -7,7 +7,7 @@ import (
 	"github.com/jimu-server/common/resp"
 	"github.com/jimu-server/db"
 	"github.com/jimu-server/gpt/args"
-	"github.com/jimu-server/gpt/llmSdk"
+	"github.com/jimu-server/gpt/llm-sdk"
 	"github.com/jimu-server/gpt/mapper"
 	"github.com/jimu-server/logger"
 	"github.com/jimu-server/middleware/auth"
@@ -23,7 +23,7 @@ var GptMapper = mapper.Gpt
 func ChatUpdate(token *auth.Token, args args.ChatArgs, content string) error {
 	var begin *sql.Tx
 	var err error
-	if begin, err = db.DB.Begin(); err != nil {
+	if begin, err = db.LocalDB.Begin(); err != nil {
 		return err
 	}
 	// 消息入库
@@ -73,9 +73,9 @@ func ChatUpdate(token *auth.Token, args args.ChatArgs, content string) error {
 // SendChatStreamMessage 聊天流消息
 func SendChatStreamMessage(c *gin.Context, params args.ChatArgs) {
 	var err error
-	var send <-chan llmSdk.LLMStream[api.ChatResponse]
+	var send <-chan llm_sdk.LLMStream[api.ChatResponse]
 	token := c.MustGet(auth.Key).(*auth.Token)
-	if send, err = llmSdk.Chat[api.ChatResponse](params.ChatRequest); err != nil {
+	if send, err = llm_sdk.Chat[api.ChatResponse](params.ChatRequest); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("消息回复失败")))
 		return
 	}
@@ -93,7 +93,7 @@ func SendChatStreamMessage(c *gin.Context, params args.ChatArgs) {
 	for data := range send {
 		v := data.Data()
 		buffer := data.Body()
-		buffer.WriteString(llmSdk.Segmentation)
+		buffer.WriteString(llm_sdk.Segmentation)
 		_, err = c.Writer.Write(buffer.Bytes()) // 根据你的实际情况调整
 		if err != nil {
 			logs.Error(err.Error())

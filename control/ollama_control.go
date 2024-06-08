@@ -10,12 +10,11 @@ import (
 	"github.com/jimu-server/config"
 	args "github.com/jimu-server/gpt/args"
 	"github.com/jimu-server/gpt/control/service"
-	"github.com/jimu-server/gpt/llmSdk"
+	"github.com/jimu-server/gpt/llm-sdk"
 	"github.com/jimu-server/middleware/auth"
 	"github.com/jimu-server/model"
 	"github.com/jimu-server/office"
 	"github.com/jimu-server/oss"
-	"github.com/jimu-server/setting"
 	"github.com/jimu-server/util/treeutils/tree"
 	"github.com/jimu-server/util/uuidutils/uuid"
 	"github.com/jimu-server/web"
@@ -38,15 +37,15 @@ func Stream(c *gin.Context) {
 
 func GetLLmModel(c *gin.Context) {
 	var err error
-	token := c.MustGet(auth.Key).(*auth.Token)
+	//token := c.MustGet(auth.Key).(*auth.Token)
 	// 获取用户的 GPT 设置 从配置的服务地址拉取模型信息
-	var useSetting *model.OllamaSetting
-	if useSetting, err = setting.GetUseSetting[*model.OllamaSetting](token.Id, "Ollama"); err != nil {
-		c.JSON(500, resp.Error(err, resp.Msg("获取用户设置失败")))
-		return
-	}
+	//var useSetting *model.OllamaSetting
+	//if useSetting, err = setting.GetUseSetting[*model.OllamaSetting](token.Id, "Ollama"); err != nil {
+	//	c.JSON(500, resp.Error(err, resp.Msg("获取用户设置失败")))
+	//	return
+	//}
 	var result *api.ListResponse
-	if result, err = llmSdk.ModelList(useSetting.Host); err != nil {
+	if result, err = llm_sdk.ModelList("http://127.0.0.1:11434"); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("拉取失败")))
 		return
 	}
@@ -57,9 +56,9 @@ func PullLLmModel(c *gin.Context) {
 	var err error
 	var reqParams *api.PullRequest
 	//var flag *model.LLmModel
-	var send <-chan llmSdk.LLMStream[api.ProgressResponse]
+	var send <-chan llm_sdk.LLMStream[api.ProgressResponse]
 	web.BindJSON(c, &reqParams)
-	if send, err = llmSdk.Pull[api.ProgressResponse](reqParams); err != nil {
+	if send, err = llm_sdk.Pull[api.ProgressResponse](reqParams); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("拉取失败")))
 		return
 	}
@@ -73,7 +72,7 @@ func PullLLmModel(c *gin.Context) {
 	}
 	for data := range send {
 		buffer := data.Body()
-		buffer.WriteString(llmSdk.Segmentation)
+		buffer.WriteString(llm_sdk.Segmentation)
 		_, err = c.Writer.Write(buffer.Bytes()) // 根据你的实际情况调整
 		if err != nil {
 			logs.Error(err.Error())
@@ -102,7 +101,7 @@ func PullLLmModel(c *gin.Context) {
 func CreateLLmModel(c *gin.Context) {
 	var err error
 	var req_params *args.CreateModel
-	var send <-chan llmSdk.LLMStream[api.ProgressResponse]
+	var send <-chan llm_sdk.LLMStream[api.ProgressResponse]
 	web.BindJSON(c, &req_params)
 	token := c.MustGet(auth.Key).(*auth.Token)
 	// 检查模型是否存在
@@ -132,7 +131,7 @@ func CreateLLmModel(c *gin.Context) {
 		c.JSON(500, resp.Error(nil, resp.Msg("模型已被删除")))
 	}
 
-	if send, err = llmSdk.CreateModel[api.ProgressResponse](req_params.CreateRequest); err != nil {
+	if send, err = llm_sdk.CreateModel[api.ProgressResponse](req_params.CreateRequest); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("模型创建失败")))
 		return
 	}
@@ -146,7 +145,7 @@ func CreateLLmModel(c *gin.Context) {
 	}
 	for data := range send {
 		buffer := data.Body()
-		buffer.WriteString(llmSdk.Segmentation)
+		buffer.WriteString(llm_sdk.Segmentation)
 		_, err = c.Writer.Write(buffer.Bytes()) // 根据你的实际情况调整
 		if err != nil {
 			logs.Error(err.Error())
@@ -201,7 +200,7 @@ func DeleteLLmModel(c *gin.Context) {
 	//	c.JSON(200, resp.Success(nil))
 	//	return
 	//}
-	if err = llmSdk.DeleteModel(reqParams); err != nil {
+	if err = llm_sdk.DeleteModel(reqParams); err != nil {
 		logs.Error(err.Error())
 		c.JSON(500, resp.Error(err, resp.Msg("ollama模型删除失败")))
 		return

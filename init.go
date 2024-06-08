@@ -51,8 +51,9 @@ func initFileDb() {
 		// 初始化db
 		err := executeSQLScript("gpt.db", initSQL)
 		if err != nil {
-			logger.Logger.Error("failed to initialize database", zap.Error(err))
+			logger.Logger.Panic("failed to initialize database", zap.Error(err))
 		}
+		logger.Info("init gpt.db success")
 	}
 }
 

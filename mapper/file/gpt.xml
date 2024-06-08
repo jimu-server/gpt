@@ -8,7 +8,7 @@
     <delete id="DelConversation">
         update
         app_chat_conversation
-        set delete=1
+        set is_delete=1
         where user_id = {UserId}
           and id = {Id};
     </delete>
@@ -16,7 +16,7 @@
     <delete id="DeleteConversationMessage">
         update
             app_chat_message
-        set delete=1
+        set is_delete=1
         where user_id = {UserId}
           and conversation_id = {Id};
     </delete>
@@ -24,7 +24,7 @@
     <select id="ConversationList">
         select *
         from app_chat_conversation
-        where user_id = {UserId} and delete=0
+        where user_id = {UserId} and is_delete=0
         order by create_time;
     </select>
 
@@ -32,7 +32,7 @@
         select *
         from app_chat_message
         where user_id = {UserId}
-          and conversation_id = {ConversationId} and delete=0
+          and conversation_id = {ConversationId} and is_delete=0
         order by create_time
     </select>
 
@@ -54,7 +54,7 @@
     <delete id="DeleteMessage">
         update
             app_chat_message
-        set delete=1
+        set is_delete=1
         where user_id = {UserId} and id in
         <for slice="{list}" item="id" open="(" separator="," close=")">
             {id}
@@ -163,5 +163,9 @@
         insert into app_chat_knowledge_instance (id, user_id, knowledge_name, knowledge_files, knowledge_description)
         values ({Id}, {UserId}, {KnowledgeName}, {KnowledgeFiles}, {KnowledgeDescription});
     </insert>
+
+    <select id="InitCheck">
+        SELECT count(*) FROM sqlite_master WHERE type='table'
+    </select>
 
 </mapper>

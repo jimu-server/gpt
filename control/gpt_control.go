@@ -37,7 +37,7 @@ func DelConversation(c *gin.Context) {
 	web.BindJSON(c, &reqParams)
 	token := c.MustGet(auth.Key).(*auth.Token)
 	reqParams["UserId"] = token.Id
-	if begin, err = db.DB.Begin(); err != nil {
+	if begin, err = db.LocalDB.Begin(); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("开启事务失败")))
 		return
 	}
@@ -105,14 +105,8 @@ func Send(c *gin.Context) {
 	token := c.MustGet(auth.Key).(*auth.Token)
 	web.BindJSON(c, &reqParams)
 	var begin *sql.Tx
-	if begin, err = db.DB.Begin(); err != nil {
+	if begin, err = db.LocalDB.Begin(); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("开启事务失败")))
-		return
-	}
-	// 获取当前用户头像信息
-	var avatar string
-	if avatar, err = GptMapper.GetUserAvatar(map[string]string{"Id": token.Id}); err != nil {
-		c.JSON(500, resp.Error(err, resp.Msg("获取头像失败")))
 		return
 	}
 	id := uuid.String()
@@ -125,7 +119,7 @@ func Send(c *gin.Context) {
 		MessageId:      reqParams.MessageId,
 		UserId:         token.Id,
 		ModelId:        reqParams.ModelId,
-		Picture:        avatar,
+		Picture:        reqParams.Avatar,
 		Role:           "user",
 		Content:        reqParams.Content,
 		CreateTime:     time.Now().Format("2006-01-02 15:04:05"),

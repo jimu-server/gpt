@@ -32,6 +32,7 @@ type SendMessageArgs struct {
 	Content        string `json:"content" form:"content" binding:"required"`
 	ModelId        string `json:"modelId" form:"modelId" binding:"required"`
 	MessageId      string `json:"messageId" form:"messageId"`
+	Avatar         string `json:"avatar" form:"avatar" binding:"required"`
 }
 
 type CreateModel struct {

@@ -1,4 +1,4 @@
-package llmSdk
+package llm_sdk
 
 import (
 	"bufio"
@@ -19,6 +19,12 @@ import (
 var pool *sync.Pool
 
 var ollama_host, ollama_port = "127.0.0.1", "11434"
+
+type Executor func() (DataEvent[any], error)
+
+type Option func(sdk *OllamaSdk)
+
+var defaultSdk = newOllama()
 
 func init() {
 	// 初始化 sdk ollama 默认读取环境中的配置信息
@@ -241,4 +247,162 @@ func stream[T any](response *http.Response) (DataEvent[T], error) {
 		}
 	}()
 	return send, nil
+}
+
+func Host(host string) Option {
+	return func(sdk *OllamaSdk) {
+		sdk.host = host
+	}
+}
+func Port(port string) Option {
+	return func(sdk *OllamaSdk) {
+		sdk.port = port
+	}
+}
+
+func Scheme(scheme string) Option {
+	return func(sdk *OllamaSdk) {
+		sdk.scheme = scheme
+	}
+}
+
+func newOllama(options ...Option) *OllamaSdk {
+	o := &OllamaSdk{
+		scheme: "http",
+		host:   ollama_host,
+		port:   ollama_port,
+	}
+	for _, option := range options {
+		option(o)
+	}
+	o.url = fmt.Sprintf("%s://%s:%s", o.scheme, o.host, o.port)
+	return o
+}
+
+func NewOllama(options ...Option) *OllamaSdk {
+	sdk := newOllama(options...)
+	defaultSdk = sdk
+	return sdk
+}
+
+type OllamaSdk struct {
+	scheme string
+	url    string
+	host   string
+	port   string
+}
+
+func (sdk *OllamaSdk) Clone() *OllamaSdk {
+	o := &OllamaSdk{
+		scheme: sdk.scheme,
+		url:    sdk.url,
+		host:   sdk.host,
+		port:   sdk.port,
+	}
+	return o
+}
+
+func (sdk *OllamaSdk) Host(host string) *OllamaSdk {
+	clone := sdk.Clone()
+	clone.host = host
+	clone.url = fmt.Sprintf("%s://%s:%s", clone.scheme, clone.host, clone.port)
+	return clone
+}
+
+func (sdk *OllamaSdk) Port(port string) *OllamaSdk {
+	clone := sdk.Clone()
+	clone.port = port
+	clone.url = fmt.Sprintf("%s://%s:%s", clone.scheme, clone.host, clone.port)
+	return clone
+}
+
+func (sdk *OllamaSdk) Scheme(scheme string) *OllamaSdk {
+	clone := sdk.Clone()
+	clone.scheme = scheme
+	clone.url = fmt.Sprintf("%s://%s:%s", clone.scheme, clone.host, clone.port)
+	return clone
+}
+
+func (sdk *OllamaSdk) DeleteModel(req *api.DeleteRequest) error {
+	client := pool.Get().(*http.Client)
+	var err error
+	var request *http.Request
+	marshal, err := jsoniter.Marshal(req)
+	if err != nil {
+		return err
+	}
+	buffer := bytes.NewBuffer(marshal)
+	url := fmt.Sprintf("http://%s:%s/api/delete", ollama_host, ollama_port)
+	if request, err = http.NewRequest(http.MethodDelete, url, buffer); err != nil {
+		return err
+	}
+	do, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+	if do.StatusCode == http.StatusOK {
+		return nil
+	}
+	var readAll []byte
+	if readAll, err = io.ReadAll(do.Body); err != nil {
+		return err
+	}
+	return errors.New(string(readAll))
+}
+
+func (sdk *OllamaSdk) ModelInfo(server string, req *api.ShowRequest) (*api.ShowResponse, error) {
+	client := pool.Get().(*http.Client)
+	var err error
+	var request *http.Request
+	marshal, err := jsoniter.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	buffer := bytes.NewBuffer(marshal)
+	url := fmt.Sprintf("http://%s/api/show", server)
+	request, err = http.NewRequest(http.MethodPost, url, buffer)
+	if err != nil {
+		return nil, err
+	}
+	do, err := client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	var data *api.ShowResponse
+	var readAll []byte
+	if readAll, err = io.ReadAll(do.Body); err != nil {
+		return nil, err
+	}
+	if err = jsoniter.Unmarshal(readAll, &data); err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func (sdk *OllamaSdk) ModelList(server string) (*api.ListResponse, error) {
+	client := pool.Get().(*http.Client)
+	var err error
+	var request *http.Request
+	url := fmt.Sprintf("%s/api/tags", server)
+	request, err = http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	do, err := client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	var data *api.ListResponse
+	var readAll []byte
+	if readAll, err = io.ReadAll(do.Body); err != nil {
+		return nil, err
+	}
+	if err = jsoniter.Unmarshal(readAll, &data); err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func (sdk *OllamaSdk) Stream(executor Executor) (DataEvent[any], error) {
+	return executor()
 }
