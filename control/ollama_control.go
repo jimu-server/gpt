@@ -37,13 +37,6 @@ func Stream(c *gin.Context) {
 
 func GetLLmModel(c *gin.Context) {
 	var err error
-	//token := c.MustGet(auth.Key).(*auth.Token)
-	// 获取用户的 GPT 设置 从配置的服务地址拉取模型信息
-	//var useSetting *model.OllamaSetting
-	//if useSetting, err = setting.GetUseSetting[*model.OllamaSetting](token.Id, "Ollama"); err != nil {
-	//	c.JSON(500, resp.Error(err, resp.Msg("获取用户设置失败")))
-	//	return
-	//}
 	var result *api.ListResponse
 	if result, err = llm_sdk.ModelList("http://127.0.0.1:11434"); err != nil {
 		c.JSON(500, resp.Error(err, resp.Msg("拉取失败")))
