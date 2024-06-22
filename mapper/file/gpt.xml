@@ -168,4 +168,10 @@
         SELECT count(*) FROM sqlite_master WHERE type='table'
     </select>
 
+    <delete id="DeleteKnowledge">
+        delete
+        from app_chat_knowledge_instance
+        where id = {Id}
+    </delete>
+
 </mapper>

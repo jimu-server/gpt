@@ -51,4 +51,6 @@ type GptMapper struct {
 	KnowledgeList         func(any) ([]*model.AppChatKnowledgeInstance, error)
 
 	CreateKnowledge func(any) error
+
+	DeleteKnowledge func(any) error
 }

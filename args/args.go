@@ -27,6 +27,12 @@ type ChatArgs struct {
 	*api.ChatRequest
 }
 
+type KnowledgeChatArgs struct {
+	ChatArgs
+	// 知识库 列表
+	KnowledgeId []string `json:"knowledgeId" form:"knowledgeId" binding:"required"`
+}
+
 type SendMessageArgs struct {
 	ConversationId string `json:"conversationId" form:"conversationId" binding:"required"`
 	Content        string `json:"content" form:"content" binding:"required"`
@@ -53,4 +59,8 @@ type GenKnowledgeArgs struct {
 
 type DeleteChatMsg struct {
 	Ids []string `json:"ids" form:"ids"`
+}
+
+type DelKnowledge struct {
+	Id string `json:"id" form:"id" binding:"required"`
 }

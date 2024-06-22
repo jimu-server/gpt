@@ -54,6 +54,26 @@ func DelConversation(c *gin.Context) {
 	c.JSON(200, resp.Success(nil, resp.Msg("创建成功")))
 }
 
+func DelConversationMessage(c *gin.Context) {
+	var err error
+	var reqParams map[string]string
+	var begin *sql.Tx
+	web.BindJSON(c, &reqParams)
+	token := c.MustGet(auth.Key).(*auth.Token)
+	reqParams["UserId"] = token.Id
+	if begin, err = db.LocalDB.Begin(); err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("开启事务失败")))
+		return
+	}
+	if err = GptMapper.DeleteConversationMessage(reqParams, begin); err != nil {
+		begin.Rollback()
+		c.JSON(500, resp.Error(err, resp.Msg("创建失败")))
+		return
+	}
+	begin.Commit()
+	c.JSON(200, resp.Success(nil, resp.Msg("创建成功")))
+}
+
 func GetConversation(c *gin.Context) {
 	var err error
 	token := c.MustGet(auth.Key).(*auth.Token)

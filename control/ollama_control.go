@@ -9,6 +9,7 @@ import (
 	args "github.com/jimu-server/gpt/args"
 	"github.com/jimu-server/gpt/control/service"
 	"github.com/jimu-server/gpt/llm-sdk"
+	"github.com/jimu-server/gpt/vector"
 	"github.com/jimu-server/middleware/auth"
 	"github.com/jimu-server/model"
 	"github.com/jimu-server/office"
@@ -24,10 +25,16 @@ import (
 	"net/http"
 )
 
-func Stream(c *gin.Context) {
+func ChatStream(c *gin.Context) {
 	var params args.ChatArgs
 	web.BindJSON(c, &params)
 	service.SendChatStreamMessage(c, params)
+}
+
+func KnowledgeChatStream(c *gin.Context) {
+	var params args.KnowledgeChatArgs
+	web.BindJSON(c, &params)
+	service.SendKnowledgeChatStreamMessage(c, params)
 }
 
 func GetLLmModel(c *gin.Context) {
@@ -311,8 +318,19 @@ func GetKnowledgeFileList(c *gin.Context) {
 	c.JSON(200, resp.Success(trees))
 }
 
-func DeleteKnowledgeFile(c *gin.Context) {
-
+func DeleteKnowledge(c *gin.Context) {
+	var err error
+	var reqParams *args.DelKnowledge
+	web.BindJSON(c, &reqParams)
+	if err = vector.DB.DeleteCollection(reqParams.Id); err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("删除失败")))
+		return
+	}
+	if err = GptMapper.DeleteKnowledge(reqParams); err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("删除失败")))
+		return
+	}
+	c.JSON(200, resp.Success(nil))
 }
 
 func UpdateKnowledgeFile(c *gin.Context) {
@@ -375,24 +393,25 @@ func GenKnowledge(c *gin.Context) {
 		}
 	}
 	// 处理文件数据转化为纯文本
-	var db *chromem.DB
-	if db, err = chromem.NewPersistentDB("./chromemDB", false); err != nil {
-		if err = taskProgress.Progress(0, "向量存储初始化失败"); err != nil {
-			c.JSON(500, resp.Error(err, resp.Msg("任务失败")))
-			return
-		}
-	}
-
-	for i, docxs := range arr {
-		if arr[i].Lines, err = office.DocxToStringSlice(docxs.FileBody); err != nil {
-			err = fmt.Errorf("%s 文件解析失败--> error:%s", docxs.FileName, err.Error())
+	for i, file := range arr {
+		var text string
+		/*if text, err = office.DocxToString(file.FileBody); err != nil {
+			err = fmt.Errorf("%s 文件解析失败--> error:%s", file.FileName, err.Error())
 			if err = taskProgress.Progress(1, err.Error(), progress.Error()); err != nil {
 				c.JSON(500, resp.Error(err, resp.Msg("任务失败")))
 				return
 			}
 			return
 		}
-		count += len(arr[i].Lines)
+		arr[i].Block = office.WordSplitter(text, 2)*/
+
+		text, err = office.ExtractTextFromPDF(file.FileBody)
+		if err != nil {
+			return
+		}
+		fmt.Println(text)
+		count += len(arr[i].Block)
+
 	}
 
 	// 对文件内容进行向量化存储
@@ -402,13 +421,13 @@ func GenKnowledge(c *gin.Context) {
 		if collection == nil {
 			return err
 		}
-		if e := db.DeleteCollection(collection.Name); e != nil {
+		if e := vector.DB.DeleteCollection(collection.Name); e != nil {
 			return e
 		}
 		return err
 	}
 	// 创建一个集合存储知识库种的文本片段
-	if collection, err = db.GetOrCreateCollection(instanceId, nil, chromem.NewEmbeddingFuncOllama("nomic-embed-text", "")); err != nil {
+	if collection, err = vector.DB.GetOrCreateCollection(instanceId, nil, chromem.NewEmbeddingFuncOllama("nomic-embed-text", "")); err != nil {
 		if err = taskProgress.Progress(100, err.Error(), progress.Error()); err != nil {
 			c.JSON(500, resp.Error(err, resp.Msg("任务失败")))
 			return
@@ -419,9 +438,9 @@ func GenKnowledge(c *gin.Context) {
 	base = 90.00
 	base = base / float64(count)
 	for _, file := range arr {
-		count = len(file.Lines)
+		count = len(file.Block)
 		step = base / float64(count)
-		for _, line := range file.Lines {
+		for _, line := range file.Block {
 			doc := chromem.Document{
 				ID:      uuid.String(),
 				Content: "search_document: " + line,

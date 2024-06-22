@@ -113,3 +113,51 @@ func SendChatStreamMessage(c *gin.Context, params args.ChatArgs) {
 		return
 	}
 }
+
+func SendKnowledgeChatStreamMessage(c *gin.Context, params args.KnowledgeChatArgs) {
+	var err error
+	var send <-chan llm_sdk.LLMStream[api.ChatResponse]
+	token := c.MustGet(auth.Key).(*auth.Token)
+	IndexKnowledge(token, params)
+	if send, err = llm_sdk.Chat[api.ChatResponse](params.ChatRequest); err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("消息回复失败")))
+		return
+	}
+	// 写入流式响应头
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		c.JSON(500, resp.Error(err, resp.Msg("消息回复失败")))
+		return
+	}
+	content := bytes.NewBuffer(nil)
+
+	for data := range send {
+		v := data.Data()
+		buffer := data.Body()
+		buffer.WriteString(llm_sdk.Segmentation)
+		_, err = c.Writer.Write(buffer.Bytes()) // 根据你的实际情况调整
+		if err != nil {
+			logs.Error(err.Error())
+			if err = data.Close(); err != nil {
+				logs.Error(err.Error())
+				break
+			}
+			break // 如果写入失败，结束函数
+		}
+		flusher.Flush() // 立即将缓冲数据发送给客户端
+		msg := v.Message.Content
+		content.WriteString(msg)
+	}
+	contentStr := content.String()
+	if err = ChatUpdate(token, params.ChatArgs, contentStr); err != nil {
+		c.JSON(500, resp.Error(err, resp.Msg("消息回复失败")))
+		return
+	}
+}
+
+func IndexKnowledge(token *auth.Token, param args.KnowledgeChatArgs) {
+
+}
