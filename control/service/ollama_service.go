@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"github.com/gin-gonic/gin"
 	"github.com/jimu-server/common/resp"
-	"github.com/jimu-server/db"
+	"github.com/jimu-server/gpt-desktop/db"
 	llm_sdk "github.com/jimu-server/gpt-desktop/gpt/llm-sdk"
 	"github.com/jimu-server/gpt/args"
 	"github.com/jimu-server/gpt/mapper"
